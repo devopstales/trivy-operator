@@ -1,0 +1,7 @@
+apiVersion: trivy-operator.devopstales.io/v1
+kind: NamespaceScanner
+metadata:
+  name: main-config
+spec:
+  crontab: "*/5 * * * *"
+  namespace_selector: "trivy-scan"
