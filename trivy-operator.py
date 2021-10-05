@@ -18,6 +18,10 @@ metadata:
 spec:
   crontab: "*/5 * * * *"
   namespace_selector: "trivy-scan"
+  registry:
+  - name: docker.io
+    user: "user"
+    password: "password"
 """
 
 """Deploy CRDs"""
@@ -116,9 +120,10 @@ async def startup_fn_trivy_cache(logger, **kwargs):
 """Scanner Creation"""
 @kopf.on.create('trivy-operator.devopstales.io', 'v1', 'namespace-scanners')
 async def create_fn(logger, spec, **kwargs):
+    CONTAINER_VULN = prometheus_client.Gauge('so_vulnerabilities', 'Container vulnerabilities', ['exported_namespace', 'image', 'severity'])
+
     """Start Prometheus Exporter"""
     prometheus_client.start_http_server(9115)
-    CONTAINER_VULN = prometheus_client.Gauge('so_vulnerabilities', 'Container vulnerabilities', ['exported_namespace', 'image', 'severity'])
     logger.info("Prometheus Exporter started...")
 
     try:
@@ -132,6 +137,11 @@ async def create_fn(logger, spec, **kwargs):
     except:
         logger.error("namespace_selector must be set !!!")
         raise kopf.PermanentError("namespace_selector must be set")
+
+    try:
+        registry_list = spec['registry']
+    except:
+        logger.info("no registry auth config is defined")
 
     try:
         while True:
@@ -180,31 +190,47 @@ async def create_fn(logger, spec, **kwargs):
                     image_name = image_list[image][0]
                     image_id = image_list[image][1]
                     ns_name = image_list[image][2]
+                    registry = image_name.split('/')[0]
+
+                    for reg in registry_list:
+                        if reg['name'] == registry:
+                          os.environ['TRIVY_USERNAME']=reg['user']
+                          os.environ['TRIVY_PASSWORD']=reg['password']
+
                     TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
                     # --ignore-policy trivy.rego
-                    trivy_result = json.loads(
-                        subprocess.check_output(TRIVY).decode("UTF-8")
-                    )
-                    item_list = trivy_result[0]["Vulnerabilities"]
-                    vuls = {
-                        "UNKNOWN": 0,"LOW": 0,
-                        "MEDIUM": 0,"HIGH": 0,
-                        "CRITICAL": 0
-                    }
-                    for item in item_list:
-                        vuls[item["Severity"]] += 1
-                    vul_list[image_name] = [vuls, ns_name]
 
-                """Generate Metricfile"""
-                for image_name in vul_list.keys():
-                    for severity in vul_list[image_name][0].keys():
-                        # namespace image severity
-                        CONTAINER_VULN.labels(vul_list[image_name][1], image_name, severity).set(int(vul_list[image_name][0][severity]))
+                    try:
+                        res = subprocess.Popen(TRIVY,stdout=subprocess.PIPE,stderr=subprocess.PIPE);
+                        output,error = res.communicate()
+                        if output:
+                            trivy_result = json.loads(output)
+                            item_list = trivy_result[0]["Vulnerabilities"]
+                            vuls = {
+                                "UNKNOWN": 0,"LOW": 0,
+                                "MEDIUM": 0,"HIGH": 0,
+                                "CRITICAL": 0
+                            }
+                            for item in item_list:
+                                vuls[item["Severity"]] += 1
+                            vul_list[image_name] = [vuls, ns_name]
+
+                            """Generate Metricfile"""
+                            for image_name in vul_list.keys():
+                                for severity in vul_list[image_name][0].keys():
+                                    CONTAINER_VULN.labels(vul_list[image_name][1], image_name, severity).set(int(vul_list[image_name][0][severity]))
+
+                        if error:
+                            logger.error("TRIVY ERROR: return %s" % (res.returncode))
+                            if b"401" in error.strip():
+                                logger.error("Repository 401 Unauthorized")
+                                #print ("Error> %s" % (error.strip()), file=sys.stderr)
+                    except:
+                        print("Error", file=sys.stderr)
+
                 await asyncio.sleep(15)
-#                return {'message': 'Scan completed'}
             else:
                 await asyncio.sleep(15)
-#                return {'message': 'Wait for next Scan'}
 
     except asyncio.CancelledError:
         logger.error("ERROR in execution")

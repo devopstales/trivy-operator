@@ -1,13 +1,13 @@
 # Trivy Operator
 
-Trivy Operator is run scheduled scans on running images of the tagged namespaces.
+Trivy Operator is an operator that default every 5 minutes execute a scan script. It will get image list from all namespaces with the label `trivy-scan=true`, and then scan this images with trivy, finally we will get metrics on `http://[pod-ip]:9115/metrics`
 
 Built with [kopf](https://github.com/nolar/kopf)
 
 ## Usage
 
 ```bash
-kubectl label namespaces guestbook-demo trivy=true
+kubectl label namespaces guestbook-demo trivy-scan=true
 # or
 kubectl apply -f deploy/10_demo.yaml
 

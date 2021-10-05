@@ -17,31 +17,29 @@ spec:
         prometheus.io/scrape: "true"
     spec:
       securityContext:
-          runAsUser: 10001
-          runAsGroup: 10001
           fsGroup: 10001
           fsGroupChangePolicy: "OnRootMismatch"
       serviceAccountName: trivy-operator
 #      imagePullSecrets:
 #      - name: regcred
       containers:
-      - image: devopstales/trivy-operator:0.1-devel
+      - image: devopstales/trivy-operator:0.1
         name: trivy-operator
         imagePullPolicy: Always
 #        env:
 #        - name: GITHUB_TOKEN
 #          value: MY-TOKEN-FROM-GITHUB
-#        volumeMounts:
-#        - name: cache
-#          mountPath: "/home/trivy-operator/trivy-cache"
+        volumeMounts:
+        - name: cache
+          mountPath: "/home/trivy-operator/trivy-cache/"
 #        - name: config-json
 #          mountPath: "/home/trivy-operator/.docker"
         ports:
           - containerPort: 9115
-#      volumes:
-#      - name: cache
-#        persistentVolumeClaim:
-#            claimName: "trivy-cache"
+      volumes:
+      - name: cache
+        persistentVolumeClaim:
+            claimName: "trivy-cache"
 #      - name: config-json
 #        secret:
 #          secretName: config-json
