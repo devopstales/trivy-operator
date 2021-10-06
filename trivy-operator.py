@@ -91,7 +91,6 @@ async def startup_fn_crd(logger, **kwargs):
     )
 
     IN_CLUSTER = os.getenv("IN_CLUSTER", False)
-    print(f"%s" % (IN_CLUSTER), file=sys.stderr)
     if IN_CLUSTER:
         k8s_config.load_incluster_config()
     else:
@@ -138,13 +137,7 @@ async def create_fn(logger, spec, **kwargs):
         logger.error("namespace_selector must be set !!!")
         raise kopf.PermanentError("namespace_selector must be set")
 
-    try:
-        registry_list = spec['registry']
-    except:
-        logger.info("no registry auth config is defined")
-
-    try:
-        while True:
+    while True:
             if pycron.is_now(crontab):
                 """Find Namespaces"""
                 IN_CLUSTER = os.getenv("IN_CLUSTER", False)
@@ -192,52 +185,53 @@ async def create_fn(logger, spec, **kwargs):
                     ns_name = image_list[image][2]
                     registry = image_name.split('/')[0]
 
-                    for reg in registry_list:
-                        if reg['name'] == registry:
-                          os.environ['TRIVY_USERNAME']=reg['user']
-                          os.environ['TRIVY_PASSWORD']=reg['password']
+                    try:
+                        registry_list = spec['registry']
+                        
+                        for reg in registry_list:
+                            if reg['name'] == registry:
+                                os.environ['TRIVY_USERNAME']=reg['user']
+                                os.environ['TRIVY_PASSWORD']=reg['password']
+                    except:
+                        logger.info("no registry auth config is defined")
 
                     TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
                     # --ignore-policy trivy.rego
 
-                    try:
-                        res = subprocess.Popen(TRIVY,stdout=subprocess.PIPE,stderr=subprocess.PIPE);
-                        output,error = res.communicate()
-                        if output:
-                            trivy_result = json.loads(output)
-                            item_list = trivy_result[0]["Vulnerabilities"]
-                            vuls = {
-                                "UNKNOWN": 0,"LOW": 0,
-                                "MEDIUM": 0,"HIGH": 0,
-                                "CRITICAL": 0
-                            }
-                            for item in item_list:
-                                vuls[item["Severity"]] += 1
-                            vul_list[image_name] = [vuls, ns_name]
+                    res = subprocess.Popen(TRIVY,stdout=subprocess.PIPE,stderr=subprocess.PIPE);
+                    output,error = res.communicate()
+                    if output:
+                        trivy_result = json.loads(output.decode("UTF-8"))
+                        item_list = trivy_result['Results'][0]["Vulnerabilities"]
+                        vuls = {
+                            "UNKNOWN": 0,"LOW": 0,
+                            "MEDIUM": 0,"HIGH": 0,
+                            "CRITICAL": 0
+                        }
+                        for item in item_list:
+                            vuls[item["Severity"]] += 1
+                        vul_list[image_name] = [vuls, ns_name]
 
-                            """Generate Metricfile"""
-                            for image_name in vul_list.keys():
-                                for severity in vul_list[image_name][0].keys():
-                                    CONTAINER_VULN.labels(vul_list[image_name][1], image_name, severity).set(int(vul_list[image_name][0][severity]))
+                        """Generate Metricfile"""
+                        for image_name in vul_list.keys():
+                            for severity in vul_list[image_name][0].keys():
+                                CONTAINER_VULN.labels(vul_list[image_name][1], image_name, severity).set(int(vul_list[image_name][0][severity]))
 
-                        if error:
-                            logger.error("TRIVY ERROR: return %s" % (res.returncode))
-                            if b"401" in error.strip():
-                                logger.error("Repository 401 Unauthorized")
-                                #print ("Error> %s" % (error.strip()), file=sys.stderr)
-                    except:
-                        print("Error", file=sys.stderr)
+                    if error:
+                        logger.error("TRIVY ERROR: return %s" % (res.returncode))
+                        if b"401" in error.strip():
+                            logger.error("Repository: Unauthorized authentication required")
+                        if b"UNAUTHORIZED" in error.strip():
+                            logger.error("Repository: Unauthorized authentication required")
+                        if b"You have reached your pull rate limit." in error.strip():
+                            logger.error("You have reached your pull rate limit.")
 
                 await asyncio.sleep(15)
             else:
                 await asyncio.sleep(15)
 
-    except asyncio.CancelledError:
-        logger.error("ERROR in execution")
-        raise kopf.PermanentError("ERROR in execution")
-
 ## print to operator log
-# print(f"And here we are! Creating: %s" % (ns_name), file=sys.stderr)
+# print(f"And here we are! Creating: %s" % (ns_name), file=sys.stderr) # debug
 ## message to CR
 #    return {'message': 'hello world'}  # will be the new status
 ## events to CR describe

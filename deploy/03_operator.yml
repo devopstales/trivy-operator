@@ -23,7 +23,7 @@ spec:
 #      imagePullSecrets:
 #      - name: regcred
       containers:
-      - image: devopstales/trivy-operator:0.1
+      - image: devopstales/trivy-operator:1.0
         name: trivy-operator
         imagePullPolicy: Always
 #        env:
