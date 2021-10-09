@@ -24,6 +24,10 @@ spec:
     password: "password"
 """
 
+#############################################################################
+# Pretasks
+#############################################################################
+
 """Deploy CRDs"""
 @kopf.on.startup()
 async def startup_fn_crd(logger, **kwargs):
@@ -115,6 +119,10 @@ async def startup_fn_trivy_cache(logger, **kwargs):
         subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
     )
     logger.info("trivy cache created...")
+
+#############################################################################
+# Operator
+#############################################################################
 
 """Scanner Creation"""
 @kopf.on.create('trivy-operator.devopstales.io', 'v1', 'namespace-scanners')
@@ -230,6 +238,21 @@ async def create_fn(logger, spec, **kwargs):
             else:
                 await asyncio.sleep(15)
 
+#############################################################################
+# Admission Controller
+#############################################################################
+
+@kopf.on.startup()
+def configure(settings: kopf.OperatorSettings, **_):
+    # Auto-detect the best server (K3d/Minikube/simple) with external tunneling as a fallback:
+    settings.admission.server = kopf.WebhookAutoTunnel()
+    settings.admission.managed = 'trivy-image-validator.devopstales.io'
+
+@kopf.on.validate('pod')
+def validate1(logger, spec, dryrun, **_):
+    logger.info("Admission Controller is working")
+
+#############################################################################
 ## print to operator log
 # print(f"And here we are! Creating: %s" % (ns_name), file=sys.stderr) # debug
 ## message to CR
