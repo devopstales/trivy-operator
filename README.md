@@ -67,6 +67,21 @@ kubectl logs
 [2021-10-02 09:45:55,556] kopf.objects         [INFO    ] [trivytest/main-config] Scanning Image: docker.io/library/nginx:latest
 ~~~
 
+### Example Deploy:
+You can define policy to the Admission Controller, by adding annotation to the pod trough the deployment:
+
+```yaml
+spec:
+  ...
+  template:
+    metadata:
+      annotations:
+        trivy.security.devopstales.io/medium: "5"
+        trivy.security.devopstales.io/low: "10"
+        trivy.security.devopstales.io/critical: "2"
+...
+```
+
 ### Development
 
 To run kopf development you need to install the fallowing packages to the k3s host:
