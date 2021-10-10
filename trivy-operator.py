@@ -25,6 +25,25 @@ spec:
 """
 
 #############################################################################
+# ToDo
+#############################################################################
+# initContainers ???
+# AC: config from CR?
+### gen CRD
+### get registry user pass from CR if exists
+# AC: prometheus]
+## container vulns
+## block and accept
+# AC: cache scanned images
+
+#############################################################################
+# Global Variables
+#############################################################################
+CONTAINER_VULN = prometheus_client.Gauge('so_vulnerabilities', 'Container vulnerabilities', ['exported_namespace', 'image', 'severity'])
+AC_VULN = prometheus_client.Gauge('ac_vulnerabilities', 'Admission Controller vulnerabilities', ['exported_namespace', 'image', 'severity'])
+IN_CLUSTER = os.getenv("IN_CLUSTER", False)
+
+#############################################################################
 # Pretasks
 #############################################################################
 
@@ -120,6 +139,12 @@ async def startup_fn_trivy_cache(logger, **kwargs):
     )
     logger.info("trivy cache created...")
 
+#"""Start Prometheus Exporter"""
+@kopf.on.startup()
+async def startup_fn_prometheus_client(logger, **kwargs):
+    prometheus_client.start_http_server(9115)
+    logger.info("Prometheus Exporter started...")
+
 #############################################################################
 # Operator
 #############################################################################
@@ -127,11 +152,7 @@ async def startup_fn_trivy_cache(logger, **kwargs):
 """Scanner Creation"""
 @kopf.on.create('trivy-operator.devopstales.io', 'v1', 'namespace-scanners')
 async def create_fn(logger, spec, **kwargs):
-    CONTAINER_VULN = prometheus_client.Gauge('so_vulnerabilities', 'Container vulnerabilities', ['exported_namespace', 'image', 'severity'])
-
-    """Start Prometheus Exporter"""
-    prometheus_client.start_http_server(9115)
-    logger.info("Prometheus Exporter started...")
+    logger.info("NamespaceScanner Created")
 
     try:
         crontab = spec['crontab']
@@ -148,7 +169,6 @@ async def create_fn(logger, spec, **kwargs):
     while True:
             if pycron.is_now(crontab):
                 """Find Namespaces"""
-                IN_CLUSTER = os.getenv("IN_CLUSTER", False)
                 image_list = {}
                 vul_list = {}
                 tagged_ns_list = []
@@ -245,12 +265,107 @@ async def create_fn(logger, spec, **kwargs):
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, **_):
     # Auto-detect the best server (K3d/Minikube/simple) with external tunneling as a fallback:
-    settings.admission.server = kopf.WebhookAutoTunnel()
+    settings.admission.server = kopf.WebhookAutoTunnel(port=443)
+    # settings.admission.server = kopf.WebhookServer(port=443, host="k3s")
     settings.admission.managed = 'trivy-image-validator.devopstales.io'
 
-@kopf.on.validate('pod')
-def validate1(logger, spec, dryrun, **_):
+@kopf.on.validate('pod', operation='CREATE')
+def validate1(logger, namespace, name, **_):
     logger.info("Admission Controller is working")
+    vul_list = {}
+    image_list = {}
+
+    if IN_CLUSTER:
+        k8s_config.load_incluster_config()
+    else:
+        k8s_config.load_kube_config()
+
+    """Find pods in namespace"""
+    pod_list = k8s_client.CoreV1Api().list_namespaced_pod(namespace)
+
+    """Find images in pods"""
+    for pod in pod_list.items:
+        pod_name = pod.metadata.name
+        if pod_name == name:
+            images = pod.status.container_statuses
+            annotations = pod.metadata.annotations
+            for image in images:
+                image_name = image.image
+                image_id = image.image_id
+                image_list[pod_name] = list()
+                image_list[pod_name].append(image_name)
+                image_list[pod_name].append(image_id)
+                image_list[pod_name].append(namespace)
+
+    """Scan images"""
+    for image in image_list:
+        image_name = image_list[image][0]
+        image_id = image_list[image][1]
+        ns_name = image_list[image][2]
+        registry = image_name.split('/')[0]
+        logger.info("Scanning Image: %s" % (image_name))
+
+        TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
+        # --ignore-policy trivy.rego
+
+        res = subprocess.Popen(TRIVY,stdout=subprocess.PIPE,stderr=subprocess.PIPE);
+        output,error = res.communicate()
+        if output:
+            trivy_result = json.loads(output.decode("UTF-8"))
+            item_list = trivy_result['Results'][0]["Vulnerabilities"]
+            vuls = {
+                "UNKNOWN": 0,"LOW": 0,
+                "MEDIUM": 0,"HIGH": 0,
+                "CRITICAL": 0
+            }
+            for item in item_list:
+                vuls[item["Severity"]] += 1
+            vul_list[image_name] = vuls
+
+            """Generate Metricfile"""
+            for image_name in vul_list.keys():
+                for severity in vul_list[image_name][0].keys():
+                    AC_VULN.labels(vul_list[image_name][1], image_name, severity).set(int(vul_list[image_name][0][severity]))
+
+        if error:
+            logger.error("TRIVY ERROR: return %s" % (res.returncode))
+            if b"401" in error.strip():
+                logger.error("Repository: Unauthorized authentication required")
+            if b"UNAUTHORIZED" in error.strip():
+                logger.error("Repository: Unauthorized authentication required")
+            if b"You have reached your pull rate limit." in error.strip():
+                logger.error("You have reached your pull rate limit.")
+
+        """Get vulnerabilities from annotations"""
+        vul_annotations= {
+                "UNKNOWN": 0,"LOW": 0,
+                "MEDIUM": 0,"HIGH": 0,
+                "CRITICAL": 0
+            }
+        for sev in vul_annotations:
+            try:
+                print(sev + ": " + annotations['trivy.security.devopstales.io/' + sev.lower()], file=sys.stderr) # Debug
+                vul_annotations[sev["Severity"]] = int(annotations['trivy.security.devopstales.io/' + sev.lower()])
+            except:
+                continue
+
+        """Check vulnerabilities"""
+        print("Check vulnerabilities:", file=sys.stderr) # Debug
+        for sev in vul_annotations:
+            try:
+                an_vul_num = vul_annotations[sev]
+                vul_num = vul_list[image_name][sev]
+                if vul_num > an_vul_num:
+                    print(sev + " is bigger", file=sys.stderr) # Debug
+                    raise kopf.AdmissionError(f"Too much vulnerability in the image: %s" % (image_name))
+                else:
+                    print(sev + " is ok", file=sys.stderr) # Debug
+                    continue
+            except:
+                continue
+
+        # print(f"%s" % (image_name), file=sys.stderr) # debug
+        
 
 #############################################################################
 ## print to operator log
