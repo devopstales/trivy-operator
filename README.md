@@ -84,15 +84,33 @@ spec:
 
 ### Development
 
+Install trivy:
+
+```bash
+nano /etc/yum.repos.d/trivy.repo
+[trivy]
+name=Trivy repository
+baseurl=https://aquasecurity.github.io/trivy-repo/rpm/releases/$releasever/$basearch/
+gpgcheck=0
+enabled=1
+
+sudo yum -y install trivy
+```
+
 To run kopf development you need to install the fallowing packages to the k3s host:
 
 ```bash
-yum install python3-8
-pip3 install kopf kubernetes asyncio pycron prometheus_client certvalidator certbuilder
+yum install -y python3.8
+pip3 install --no-cache-dir kopf kubernetes asyncio pycron prometheus_client certvalidator certbuilder
+pip3 install --no-cache-dir kopf[devel]
 ```
 
 The admission webhook try to call the host with the domain name `host.k3d.internal` so I added to the host's `/etc/host` file.
 
-```yaml
+```bash
 echo "172.17.12.10 host.k3d.internal" >> /etc/host
+```
+
+```bash
+kopf run -A ./trivy-operator.py
 ```

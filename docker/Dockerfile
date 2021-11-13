@@ -6,7 +6,8 @@ ENV TRIVY_CACHE_DIR=/home/trivy-operator/trivy-cache \
 
 RUN apk add --no-cache gcc musl-dev
 
-RUN pip3 install --no-cache-dir kopf kubernetes asyncio pycron prometheus_client certvalidator certbuilder
+RUN pip3 install --no-cache-dir kopf kubernetes asyncio pycron prometheus_client certvalidator certbuilder \
+    pip3 install --no-cache-dir kopf[dev]
 
 COPY trivy-operator.py /trivy-operator.py
 COPY trivy /usr/local/bin
