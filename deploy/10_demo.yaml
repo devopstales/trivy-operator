@@ -12,6 +12,13 @@ metadata:
   name: nginx
   namespace: trivytest
 spec:
+  initContainers:
+  - name: init
+    image: nginxinc/nginx-unprivileged:latest
+    command: ['sh', '-c', 'echo The app is running! && sleep 10']
+  - name: init2
+    image: nginxinc/nginx-unprivileged:latest
+    command: ['sh', '-c', 'echo The app is running! && sleep 10']
   containers:
   - image: nginx:1.18
     imagePullPolicy: IfNotPresent
@@ -27,3 +34,6 @@ spec:
   - image: nginx
     imagePullPolicy: IfNotPresent
     name: nginx
+  - image: nginx
+    imagePullPolicy: IfNotPresent
+    name: nginx2
