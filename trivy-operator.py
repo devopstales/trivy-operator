@@ -9,6 +9,7 @@ import sys
 import subprocess
 import json
 import validators
+from typing import AsyncIterator
 
 """
 apiVersion: trivy-operator.devopstales.io/v1
@@ -288,11 +289,34 @@ async def create_fn(logger, spec, **kwargs):
 #############################################################################
 # Admission Controller
 #############################################################################
+# https://github.com/nolar/kopf/issues/785#issuecomment-859931945
+if IN_CLUSTER:
+    class ServiceTunnel:
+        async def __call__(
+            self, fn: kopf.WebhookFn
+        ) -> AsyncIterator[kopf.WebhookClientConfig]:
+            # https://github.com/kubernetes-client/python/issues/363
+            # Use field reference to environment variable instad
+            namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+            name = "trivy-image-validator"
+            service_port = int(443)
+            container_port = int(8443)
+            server = kopf.WebhookServer(port=container_port, host=f"{name}.{namespace}.svc")
+            async for client_config in server(fn):
+                client_config["url"] = None
+                client_config["service"] = kopf.WebhookClientConfigService(
+                    name=name, namespace=namespace, port=service_port
+                )
+                yield client_config
 
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, **_):
     # Auto-detect the best server (K3d/Minikube/simple):
-    settings.admission.server = kopf.WebhookAutoServer(port=443)
+    if IN_CLUSTER:
+#      settings.admission.server = kopf.WebhookServer(addr='0.0.0.0', port=8443, host="trivy-image-validator.trivy-operator.svc")
+      settings.admission.server = ServiceTunnel()
+    else:
+      settings.admission.server = kopf.WebhookAutoServer(port=443)
     settings.admission.managed = 'trivy-image-validator.devopstales.io'
 
 @kopf.on.validate('pod', operation='CREATE')

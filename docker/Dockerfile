@@ -1,19 +1,16 @@
-FROM python:3.8-alpine
+FROM python:3.8.12-slim-buster
 
 ENV TRIVY_CACHE_DIR=/home/trivy-operator/trivy-cache \
     TRIVY_QUIET=true \
     IN_CLUSTER=true
 
-RUN apk add --no-cache gcc musl-dev
-
-RUN pip3 install --no-cache-dir kopf kubernetes asyncio pycron prometheus_client certvalidator certbuilder
-RUN pip3 install --no-cache-dir kopf[dev]
+RUN pip3 install --no-cache-dir kopf[dev] kubernetes asyncio pycron prometheus_client oscrypto certvalidator certbuilder validators
 
 COPY trivy-operator.py /trivy-operator.py
 COPY trivy /usr/local/bin
 
-RUN addgroup -S -g 10001 trivy-operator && \
-    adduser -S -u 10001 trivy-operator -G trivy-operator && \
+RUN addgroup --gid 10001 trivy-operator && \
+    adduser --uid 10001 trivy-operator --ingroup trivy-operator && \
     mkdir /home/trivy-operator/trivy-cache && \
     chown -R trivy-operator:trivy-operator /home/trivy-operator/trivy-cache
 
