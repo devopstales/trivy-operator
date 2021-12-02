@@ -1,8 +1,20 @@
 # Trivy Operator
 
-Trivy Operator is an operator that default every 5 minutes execute a scan script. It will get image list from all namespaces with the label `trivy-scan=true`, and then scan this images with trivy, finally we will get metrics on `http://[pod-ip]:9115/metrics`
-
 Built with [kopf](https://github.com/nolar/kopf)
+
+Main functions:
+
+* Scheduled Image scans on running pods
+* Trivy Image Validator Admission controller
+
+Inspirated by [knqyf263](https://github.com/knqyf263)'s [trivy-enforcer](https://github.com/aquasecurity/trivy-enforcer) and [fleeto](https://github.com/fleeto)'s [trivy-scanner](https://github.com/fleeto/trivy-scanner).
+
+### Schefuled Image scans
+Default every 5 minutes execute a scan script. It will get image list from all namespaces with the label `trivy-scan=true`, and then scan this images with trivy, finally we will get metrics on `http://[pod-ip]:9115/metrics`
+
+### Trivy Image Validator
+The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy.
+
 
 ## Usage
 
@@ -54,3 +66,51 @@ kubectl logs
 [2021-10-02 09:45:52,227] kopf.objects         [INFO    ] [trivytest/main-config] Scanning Image: docker.io/library/nginx:1.18
 [2021-10-02 09:45:55,556] kopf.objects         [INFO    ] [trivytest/main-config] Scanning Image: docker.io/library/nginx:latest
 ~~~
+
+### Example Deploy:
+You can define policy to the Admission Controller, by adding annotation to the pod trough the deployment:
+
+```yaml
+spec:
+  ...
+  template:
+    metadata:
+      annotations:
+        trivy.security.devopstales.io/medium: "5"
+        trivy.security.devopstales.io/low: "10"
+        trivy.security.devopstales.io/critical: "2"
+...
+```
+
+### Development
+
+Install trivy:
+
+```bash
+nano /etc/yum.repos.d/trivy.repo
+[trivy]
+name=Trivy repository
+baseurl=https://aquasecurity.github.io/trivy-repo/rpm/releases/$releasever/$basearch/
+gpgcheck=0
+enabled=1
+
+sudo yum -y install trivy
+```
+
+To run kopf development you need to install the fallowing packages to the k3s host:
+
+```bash
+yum install -y python3.8
+pip3 install --no-cache-dir kopf kubernetes asyncio pycron prometheus_client certvalidator certbuilder
+pip3 install --no-cache-dir kopf[devel]
+```
+
+The admission webhook try to call the host with the domain name `host.k3d.internal` so I added to the host's `/etc/host` file.
+
+```bash
+echo "172.17.12.10 host.k3d.internal" >> /etc/host
+```
+
+```bash
+kopf run -A ./trivy-operator.py
+```
