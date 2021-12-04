@@ -1,11 +1,11 @@
 import kopf
 import kubernetes.client as k8s_client
 import kubernetes.config as k8s_config
+from kubernetes.client.rest import ApiException
 import prometheus_client
 import asyncio
 import pycron
 import os
-import sys
 import subprocess
 import json
 import validators
@@ -38,9 +38,18 @@ spec:
 #############################################################################
 # Global Variables
 #############################################################################
-CONTAINER_VULN = prometheus_client.Gauge('so_vulnerabilities', 'Container vulnerabilities', ['exported_namespace', 'image', 'severity'])
-AC_VULN = prometheus_client.Gauge('ac_vulnerabilities', 'Admission Controller vulnerabilities', ['exported_namespace', 'image', 'severity'])
+CONTAINER_VULN = prometheus_client.Gauge(
+    'so_vulnerabilities',
+    'Container vulnerabilities',
+    ['exported_namespace', 'image', 'severity']
+)
+AC_VULN = prometheus_client.Gauge(
+    'ac_vulnerabilities',
+    'Admission Controller vulnerabilities',
+    ['exported_namespace', 'image', 'severity']
+)
 IN_CLUSTER = os.getenv("IN_CLUSTER", False)
+IS_GLOBAL = os.getenv("IS_GLOBAL", True)
 
 #############################################################################
 # Pretasks
@@ -116,7 +125,7 @@ async def startup_fn_crd(logger, **kwargs):
         k8s_config.load_incluster_config()
     else:
         k8s_config.load_kube_config()
-    
+
 
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.ApiextensionsV1Api(api_client)
@@ -137,7 +146,7 @@ async def startup_fn_trivy_cache(logger, **kwargs):
     )
     logger.info("trivy cache created...")
 
-#"""Start Prometheus Exporter"""
+"""Start Prometheus Exporter"""
 @kopf.on.startup()
 async def startup_fn_prometheus_client(logger, **kwargs):
     prometheus_client.start_http_server(9115)
@@ -230,7 +239,7 @@ async def create_fn(logger, spec, **kwargs):
 
                     try:
                         registry_list = spec['registry']
-                        
+
                         for reg in registry_list:
                             if reg['name'] == registry:
                                 os.environ['DOCKER_REGISTRY']=reg['name']
@@ -252,7 +261,7 @@ async def create_fn(logger, spec, **kwargs):
 
                     res = subprocess.Popen(TRIVY,stdout=subprocess.PIPE,stderr=subprocess.PIPE);
                     output,error = res.communicate()
-                    
+
                     if error:
                         """Error Logging"""
                         logger.error("TRIVY ERROR: return %s" % (res.returncode))
@@ -280,7 +289,10 @@ async def create_fn(logger, spec, **kwargs):
                 """Generate Metricfile"""
                 for image_name in vul_list.keys():
                     for severity in vul_list[image_name][0].keys():
-                        CONTAINER_VULN.labels(vul_list[image_name][1], image_name, severity).set(int(vul_list[image_name][0][severity]))
+                        CONTAINER_VULN.labels(
+                            vul_list[image_name][1],
+                            image_name, severity).set(int(vul_list[image_name][0][severity])
+                        )
 
                 await asyncio.sleep(15)
             else:
@@ -309,15 +321,72 @@ if IN_CLUSTER:
                 )
                 yield client_config
 
+'''    def build_certificate(
+        hostnames: Collection[str],
+        password: Optional[str] = None,
+    ) -> Tuple[bytes, bytes]:
+        # For a self-signed certificate, the CA bundle is the certificate itself
+        try:
+            import certbuilder
+            import oscrypto.asymmetric
+        except ImportError:
+            raise MissingDependencyError("Need certbuilder")
+
+# https://github.com/nolar/kopf/blob/7ba1771306df7db9fa654c2c9bc7983eb5d5061b/kopf/_kits/webhooks.py#L344
+'''
+
 @kopf.on.startup()
-def configure(settings: kopf.OperatorSettings, **_):
+def configure(settings: kopf.OperatorSettings, logger, **_):
     # Auto-detect the best server (K3d/Minikube/simple):
     if IN_CLUSTER:
-#      settings.admission.server = kopf.WebhookServer(addr='0.0.0.0', port=8443, host="trivy-image-validator.trivy-operator.svc")
-      settings.admission.server = ServiceTunnel()
+      if IS_GLOBAL:
+          settings.admission.server = ServiceTunnel()
+          # Create ValidatingWebhookConfiguration
+          settings.admission.managed = 'trivy-image-validator.devopstales.io'
+      else:
+          # Geberate cert
+          # Start Admission Server
+#          settings.admission.server = kopf.WebhookServer(addr='0.0.0.0', port=8443, host="trivy-image-validator.trivy-operator.svc")
+
+          '''Create own ValidatingWebhookConfiguration'''
+          k8s_config.load_incluster_config()
+          with k8s_client.ApiClient() as api_client:
+              api_instance = k8s_client.AdmissionregistrationV1Api(api_client)
+              body = k8s_client.V1ValidatingWebhookConfiguration(
+                  metadata=k8s_client.V1ObjectMeta(name='trivy-image-validating-webhook-cfg'),
+                  webhooks=[k8s_client.V1ValidatingWebhook(
+                      kubernetes.client_config=k8s_client.AdmissionregistrationV1WebhookClientConfig(
+                          ca_bundle="", #???
+                          service=k8s_client.AdmissionregistrationV1ServiceReference(
+                              name="trivy-image-validator",
+                              namespace=os.environ.get("POD_NAMESPACE", "trivy-operator"),
+                              path="" #???
+                          )
+                      ),
+                      admission_review_versions=["v1beta1", "v1"],
+                      name='trivy-operator.devopstales.intra',
+                      namespace_selector=k8s_client.V1LabelSelector(
+                          match_labels={"trivy-operator-validation": "enabled"}
+                      ),
+                      rules=[k8s_client.V1RuleWithOperations(
+                          api_groups=["apps", ""],
+                          api_versions=["*"],
+                          operations=["CREATE"],
+                          resources=["pods"]
+                      )],
+                      side_effects="None",
+                      timeout_seconds=30
+                  )]
+              ),
+              field_manager = 'trivy-operator'
+              try:
+                  api_response = api_instance.create_validating_webhook_configuration(body, field_manager=field_manager)
+                  logger.info(api_response) # Debug
+              except ApiException as e:
+                  raise e
     else:
       settings.admission.server = kopf.WebhookAutoServer(port=443)
-    settings.admission.managed = 'trivy-image-validator.devopstales.io'
+      settings.admission.managed = 'trivy-image-validator.devopstales.io'
 
 @kopf.on.validate('pod', operation='CREATE')
 def validate1(logger, namespace, name, annotations, spec, **_):
