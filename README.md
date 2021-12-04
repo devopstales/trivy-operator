@@ -13,13 +13,14 @@ Inspirated by [knqyf263](https://github.com/knqyf263)'s [trivy-enforcer](https:/
 Default every 5 minutes execute a scan script. It will get image list from all namespaces with the label `trivy-scan=true`, and then scan this images with trivy, finally we will get metrics on `http://[pod-ip]:9115/metrics`
 
 ### Trivy Image Validator
-The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy.
+The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy if it is in a namespace with the lable `trivy-operator-validation=true`.
 
 
 ## Usage
 
 ```bash
 kubectl label namespaces guestbook-demo trivy-scan=true
+kubectl label namespaces guestbook-demo trivy-operator-validation=true
 # or
 kubectl apply -f deploy/10_demo.yaml
 

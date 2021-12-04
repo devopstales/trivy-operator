@@ -4,6 +4,7 @@ kind: Namespace
 metadata:
   labels:
     trivy-scan: "true"
+    trivy-operator-validation: "true"
   name: trivytest
 ---
 apiVersion: v1
