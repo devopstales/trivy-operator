@@ -420,7 +420,7 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
                       side_effects="None",
                       timeout_seconds=30
                   )]
-              ),
+              )
           pretty = 'true'
           # field_manager = 'trivy-operator'
           logger.info(body) # debug
