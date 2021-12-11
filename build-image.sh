@@ -1,6 +1,7 @@
-#!/bin/sh
-cp /tmp/trivy docker
+#!/bin/bash
+
 cp trivy-operator.py docker/trivy-operator.py
+kim rmi ${1}-devel
 kim build --tag ${1}-devel docker/
 #docker build -t $1 \
 #  docker

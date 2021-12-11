@@ -9,9 +9,8 @@ import os
 import subprocess
 import json
 import validators
-from typing import AsyncIterator
 import base64
-from typing import Optional, Tuple
+from typing import AsyncIterator, Optional, Tuple, Collection
 
 """
 apiVersion: trivy-operator.devopstales.io/v1
@@ -324,10 +323,13 @@ if IN_CLUSTER:
                 yield client_config
 
     def build_certificate(
-        hostname: str,
+        hostname: Collection[str],
         password: Optional[str] = None,
     ) -> Tuple[bytes, bytes]:
-        # For a self-signed certificate, the CA bundle is the certificate itself
+        """
+        https://github.com/nolar/kopf/blob/7ba1771306df7db9fa654c2c9bc7983eb5d5061b/kopf/_kits/webhooks.py#L344
+        For a self-signed certificate, the CA bundle is the certificate itself
+        """
         try:
             import certbuilder
             import oscrypto.asymmetric
@@ -342,16 +344,11 @@ if IN_CLUSTER:
         builder.key_usage = {'digital_signature', 'key_encipherment', 'key_cert_sign', 'crl_sign'}
         builder.extended_key_usage = {'server_auth', 'client_auth'}
         builder.self_signed = True
-        builder.subject_alt_domains = hostname
+        builder.subject_alt_domains = list(hostname)
         certificate = builder.build(private_key)
         cert_pem = certbuilder.pem_armor_certificate(certificate)
         pkey_pem = oscrypto.asymmetric.dump_private_key(private_key, password, target_ms=10)
         return cert_pem, pkey_pem
-
-
-'''
-# https://github.com/nolar/kopf/blob/7ba1771306df7db9fa654c2c9bc7983eb5d5061b/kopf/_kits/webhooks.py#L344
-'''
 
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, logger, **_):
@@ -360,29 +357,34 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
       if IS_GLOBAL:
           logger.info("Start admission server")
           settings.admission.server = ServiceTunnel()
-          # Create ValidatingWebhookConfiguration
+          # Automaticle create ValidatingWebhookConfiguration
           settings.admission.managed = 'trivy-image-validator.devopstales.io'
       else:
+          # test if file exists
+            # delete cert file
+            # delete validating webhook configuration ??
+            ## https://github.com/kubernetes-client/python/blob/e8e6a86a30159a21b950ed873e69514abb5d359f/kubernetes/docs/AdmissionregistrationV1Api.md#delete_validating_webhook_configuration
           # Generate cert
           logger.info("Generating a self-signed certificate for HTTPS.")
           namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
           name = "trivy-image-validator"
-          hostnames = f"{name}.{namespace}.svc"
-          certdata, pkeydata = build_certificate(hostnames)
+          hostname = f"{name}.{namespace}.svc"
+          certdata, pkeydata = build_certificate([hostname, "localhost"])
           # write to file
-          certf = open("/tmp/ca.pem","w+")
-          certf.write(str(certdata))
+          certf = open("/home/trivy-operator/trivy-cache/cert.pem","w+")
+          certf.write(str(certdata.decode('ascii')))
           certf.close()
-          pkeyf = open("/tmp/key.pem","w+")
-          pkeyf.write(str(pkeydata))
+          pkeyf = open("/home/trivy-operator/trivy-cache/key.pem","w+")
+          pkeyf.write(str(pkeydata.decode('ascii')))
           pkeyf.close()
           caBundle = base64.b64encode(certdata).decode('ascii')
 
           # Start Admission Server
           settings.admission.server = kopf.WebhookServer(
               port=8443,
-              host=f"{name}.{namespace}.svc",
-              cafile=certf.name
+              host=hostname,
+              certfile=certf.name,
+              pkeyfile=pkeyf.name
           )
 
           '''Create own ValidatingWebhookConfiguration'''
@@ -422,14 +424,15 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
                   )]
               )
           pretty = 'true'
-          # field_manager = 'trivy-operator'
-          logger.info(body) # debug
+          field_manager = 'trivy-operator'
           try:
-              api_response = api_instance.create_validating_webhook_configuration(body, pretty=pretty)
-              logger.info(api_response) # Debug
+              api_response = api_instance.create_validating_webhook_configuration(body, pretty=pretty, field_manager=field_manager)
           except ApiException as e:
-              #raise e
-              logger.error("Exception when calling AdmissionregistrationV1Api->create_validating_webhook_configuration: %s\n" % e)
+              if e.status == 409: # if the object already exists the K8s API will respond with a 409 Conflict
+                  logger.info("validating webhook configuration already exists!!!")
+              else:
+                logger.error("Exception when calling AdmissionregistrationV1Api->create_validating_webhook_configuration: %s\n" % e)
+        
     else:
       settings.admission.server = kopf.WebhookAutoServer(port=443)
       settings.admission.managed = 'trivy-image-validator.devopstales.io'
