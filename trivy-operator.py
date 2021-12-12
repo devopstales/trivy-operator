@@ -362,6 +362,7 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
           # Automaticle create ValidatingWebhookConfiguration
           settings.admission.managed = 'trivy-image-validator.devopstales.io'
       else:
+          k8s_config.load_incluster_config()
           if os.path.exists('/home/trivy-operator/trivy-cache/cert.pem'):
               certfile = open('/home/trivy-operator/trivy-cache/cert.pem').read()
               cert = crypto.load_certificate(c.FILETYPE_PEM, certfile)
@@ -375,6 +376,13 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
                   os.remove("/home/trivy-operator/trivy-cache/key.pem")
                   # delete validating webhook configuration ??
                   ## https://github.com/kubernetes-client/python/blob/e8e6a86a30159a21b950ed873e69514abb5d359f/kubernetes/docs/AdmissionregistrationV1Api.md#delete_validating_webhook_configuration
+                  with k8s_client.ApiClient() as api_client:
+                    api_instance = k8s_client.AdmissionregistrationV1Api(api_client)
+                    name = 'trivy-image-validator.devopstales.io'
+                    try:
+                        api_response = api_instance.delete_validating_webhook_configuration(name)
+                    except ApiException as e:
+                        logger.error("Exception when calling AdmissionregistrationV1Api->delete_validating_webhook_configuration: %s\n" % e)
           # Generate cert
           logger.info("Generating a self-signed certificate for HTTPS.")
           namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
@@ -399,7 +407,6 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
           )
 
           '''Create own ValidatingWebhookConfiguration'''
-          k8s_config.load_incluster_config()
           with k8s_client.ApiClient() as api_client:
               api_instance = k8s_client.AdmissionregistrationV1Api(api_client)
               body = k8s_client.V1ValidatingWebhookConfiguration(
