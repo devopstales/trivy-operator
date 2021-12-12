@@ -11,6 +11,8 @@ import json
 import validators
 import base64
 from typing import AsyncIterator, Optional, Tuple, Collection
+from datetime import datetime
+from OpenSSL import crypto
 
 """
 apiVersion: trivy-operator.devopstales.io/v1
@@ -360,10 +362,19 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
           # Automaticle create ValidatingWebhookConfiguration
           settings.admission.managed = 'trivy-image-validator.devopstales.io'
       else:
-          # test if file exists
-            # delete cert file
-            # delete validating webhook configuration ??
-            ## https://github.com/kubernetes-client/python/blob/e8e6a86a30159a21b950ed873e69514abb5d359f/kubernetes/docs/AdmissionregistrationV1Api.md#delete_validating_webhook_configuration
+          if os.path.exists('/home/trivy-operator/trivy-cache/cert.pem'):
+              certfile = open('/home/trivy-operator/trivy-cache/cert.pem').read()
+              cert = crypto.load_certificate(c.FILETYPE_PEM, certfile)
+              certExpires = datetime.strptime(str(cert.get_notAfter(), "ascii"),"%Y%m%d%H%M%SZ")
+              daysToExpiration = (certExpires - datetime.now()).days
+              logger.info("Day to certifiacet expiration: %s" % daysToExpiration) #debug
+              if daysToExpiration <= 7: # debug 365
+                  logger.error("Certificate Expires soon")
+                  # delete cert file
+                  os.remove("/home/trivy-operator/trivy-cache/cert.pem")
+                  os.remove("/home/trivy-operator/trivy-cache/key.pem")
+                  # delete validating webhook configuration ??
+                  ## https://github.com/kubernetes-client/python/blob/e8e6a86a30159a21b950ed873e69514abb5d359f/kubernetes/docs/AdmissionregistrationV1Api.md#delete_validating_webhook_configuration
           # Generate cert
           logger.info("Generating a self-signed certificate for HTTPS.")
           namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")

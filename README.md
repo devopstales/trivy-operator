@@ -102,8 +102,7 @@ To run kopf development you need to install the fallowing packages to the k3s ho
 
 ```bash
 yum install -y python3.8
-pip3 install --no-cache-dir kopf kubernetes asyncio pycron prometheus_client certvalidator certbuilder
-pip3 install --no-cache-dir kopf[devel]
+pip3 install --no-cache-dir kopf[dev] kubernetes asyncio pycron prometheus_client oscrypto certvalidator certbuilder validators pyOpenSSL
 ```
 
 The admission webhook try to call the host with the domain name `host.k3d.internal` so I added to the host's `/etc/host` file.

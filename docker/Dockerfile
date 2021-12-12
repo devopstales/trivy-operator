@@ -15,7 +15,7 @@ RUN export TRIVY_VERSION=$(curl --silent "https://api.github.com/repos/aquasecur
     dpkg -i /tmp/trivy.deb && \
     rm /tmp/trivy.deb
 
-RUN pip3 install --no-cache-dir kopf[dev] kubernetes asyncio pycron prometheus_client oscrypto certvalidator certbuilder validators
+RUN pip3 install --no-cache-dir kopf[dev] kubernetes asyncio pycron prometheus_client oscrypto certvalidator certbuilder validators pyOpenSSL
 
 COPY trivy-operator.py /trivy-operator.py
 
