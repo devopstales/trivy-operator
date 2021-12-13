@@ -33,11 +33,9 @@ spec:
 # ToDo
 #############################################################################
 # OP
+## cache scanned images ???
 # AC
-## namespace selector for admission controller webhook
-# cache scanned images ???
-
-
+## cache scanned images ???
 #############################################################################
 # Global Variables
 #############################################################################
@@ -304,7 +302,7 @@ async def create_fn(logger, spec, **kwargs):
 #############################################################################
 # Admission Controller
 #############################################################################
-# https://github.com/nolar/kopf/issues/785#issuecomment-859931945
+
 if IN_CLUSTER:
     class ServiceTunnel:
         async def __call__(
@@ -411,6 +409,7 @@ if IN_CLUSTER:
               else:
                 logger.error("Exception when calling AdmissionregistrationV1Api->create_validating_webhook_configuration: %s\n" % e)
 
+#############################################################################
 
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, logger, **_):
@@ -440,8 +439,7 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
                   # delete cert file
                   os.remove(cert_file)
                   os.remove(key_file)
-                  # delete validating webhook configuration ??
-                  ## https://github.com/kubernetes-client/python/blob/e8e6a86a30159a21b950ed873e69514abb5d359f/kubernetes/docs/AdmissionregistrationV1Api.md#delete_validating_webhook_configuration
+                  # delete validating webhook configuration
                   with k8s_client.ApiClient() as api_client:
                     api_instance = k8s_client.AdmissionregistrationV1Api(api_client)
                     name = 'trivy-image-validator.devopstales.io'
