@@ -325,6 +325,7 @@ if IN_CLUSTER:
                 yield client_config
 
     def build_certificate(
+        logger,
         hostname: Collection[str],
         password: Optional[str] = None,
     ) -> Tuple[bytes, bytes]:
@@ -352,61 +353,20 @@ if IN_CLUSTER:
         pkey_pem = oscrypto.asymmetric.dump_private_key(private_key, password, target_ms=10)
         return cert_pem, pkey_pem
 
-@kopf.on.startup()
-def configure(settings: kopf.OperatorSettings, logger, **_):
-    # Auto-detect the best server (K3d/Minikube/simple):
-    if IN_CLUSTER:
-      if IS_GLOBAL:
-          logger.info("Start admission server")
-          settings.admission.server = ServiceTunnel()
-          # Automaticle create ValidatingWebhookConfiguration
-          settings.admission.managed = 'trivy-image-validator.devopstales.io'
-      else:
-          k8s_config.load_incluster_config()
-          if os.path.exists('/home/trivy-operator/trivy-cache/cert.pem'):
-              certfile = open('/home/trivy-operator/trivy-cache/cert.pem').read()
-              cert = crypto.load_certificate(c.FILETYPE_PEM, certfile)
-              certExpires = datetime.strptime(str(cert.get_notAfter(), "ascii"),"%Y%m%d%H%M%SZ")
-              daysToExpiration = (certExpires - datetime.now()).days
-              logger.info("Day to certifiacet expiration: %s" % daysToExpiration) #debug
-              if daysToExpiration <= 7: # debug 365
-                  logger.error("Certificate Expires soon")
-                  # delete cert file
-                  os.remove("/home/trivy-operator/trivy-cache/cert.pem")
-                  os.remove("/home/trivy-operator/trivy-cache/key.pem")
-                  # delete validating webhook configuration ??
-                  ## https://github.com/kubernetes-client/python/blob/e8e6a86a30159a21b950ed873e69514abb5d359f/kubernetes/docs/AdmissionregistrationV1Api.md#delete_validating_webhook_configuration
-                  with k8s_client.ApiClient() as api_client:
-                    api_instance = k8s_client.AdmissionregistrationV1Api(api_client)
-                    name = 'trivy-image-validator.devopstales.io'
-                    try:
-                        api_response = api_instance.delete_validating_webhook_configuration(name)
-                    except ApiException as e:
-                        logger.error("Exception when calling AdmissionregistrationV1Api->delete_validating_webhook_configuration: %s\n" % e)
+    def gen_cert_and_vwc(logger, hostname, cert_file, key_file):
           # Generate cert
           logger.info("Generating a self-signed certificate for HTTPS.")
-          namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
-          name = "trivy-image-validator"
-          hostname = f"{name}.{namespace}.svc"
-          certdata, pkeydata = build_certificate([hostname, "localhost"])
+          certdata, pkeydata = build_certificate(logger, [hostname, "localhost"])
           # write to file
-          certf = open("/home/trivy-operator/trivy-cache/cert.pem","w+")
+          certf = open(cert_file,"w+")
           certf.write(str(certdata.decode('ascii')))
           certf.close()
-          pkeyf = open("/home/trivy-operator/trivy-cache/key.pem","w+")
+          pkeyf = open(key_file,"w+")
           pkeyf.write(str(pkeydata.decode('ascii')))
           pkeyf.close()
           caBundle = base64.b64encode(certdata).decode('ascii')
 
-          # Start Admission Server
-          settings.admission.server = kopf.WebhookServer(
-              port=8443,
-              host=hostname,
-              certfile=certf.name,
-              pkeyfile=pkeyf.name
-          )
-
-          '''Create own ValidatingWebhookConfiguration'''
+          # Create own ValidatingWebhookConfiguration
           with k8s_client.ApiClient() as api_client:
               api_instance = k8s_client.AdmissionregistrationV1Api(api_client)
               body = k8s_client.V1ValidatingWebhookConfiguration(
@@ -450,7 +410,58 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
                   logger.info("validating webhook configuration already exists!!!")
               else:
                 logger.error("Exception when calling AdmissionregistrationV1Api->create_validating_webhook_configuration: %s\n" % e)
-        
+
+
+@kopf.on.startup()
+def configure(settings: kopf.OperatorSettings, logger, **_):
+    # Auto-detect the best server (K3d/Minikube/simple):
+    if IN_CLUSTER:
+      if IS_GLOBAL:
+          logger.info("Start admission server")
+          settings.admission.server = ServiceTunnel()
+          # Automaticle create ValidatingWebhookConfiguration
+          settings.admission.managed = 'trivy-image-validator.devopstales.io'
+      else:
+          k8s_config.load_incluster_config()
+          namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+          name = "trivy-image-validator"
+          hostname = f"{name}.{namespace}.svc"
+          cert_file="/home/trivy-operator/trivy-cache/cert.pem"
+          key_file="/home/trivy-operator/trivy-cache/key.pem"
+
+          if os.path.exists(cert_file):
+              certfile = open(cert_file).read()
+              cert = crypto.load_certificate(crypto.FILETYPE_PEM, certfile)
+              certExpires = datetime.strptime(str(cert.get_notAfter(), "ascii"),"%Y%m%d%H%M%SZ")
+              daysToExpiration = (certExpires - datetime.now()).days
+              logger.info("Day to certifiacet expiration: %s" % daysToExpiration) #debug
+              if daysToExpiration <= 7: # debug 365
+                  logger.warning("Certificate Expires soon. Regenerating.")
+                  # delete cert file
+                  os.remove(cert_file)
+                  os.remove(key_file)
+                  # delete validating webhook configuration ??
+                  ## https://github.com/kubernetes-client/python/blob/e8e6a86a30159a21b950ed873e69514abb5d359f/kubernetes/docs/AdmissionregistrationV1Api.md#delete_validating_webhook_configuration
+                  with k8s_client.ApiClient() as api_client:
+                    api_instance = k8s_client.AdmissionregistrationV1Api(api_client)
+                    name = 'trivy-image-validator.devopstales.io'
+                    try:
+                        api_response = api_instance.delete_validating_webhook_configuration(name)
+                    except ApiException as e:
+                        logger.error("Exception when calling AdmissionregistrationV1Api->delete_validating_webhook_configuration: %s\n" % e)
+                  # gen cert and vwc
+                  gen_cert_and_vwc(logger, hostname, cert_file, key_file)
+          else:
+            gen_cert_and_vwc(logger, hostname, cert_file, key_file)
+
+          # Start Admission Server
+          settings.admission.server = kopf.WebhookServer(
+              port=8443,
+              host=hostname,
+              certfile=cert_file,
+              pkeyfile=key_file
+          )
+
     else:
       settings.admission.server = kopf.WebhookAutoServer(port=443)
       settings.admission.managed = 'trivy-image-validator.devopstales.io'
