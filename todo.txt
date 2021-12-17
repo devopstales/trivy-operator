@@ -1,4 +1,6 @@
+### grafana + prometheus
 
+```bash
 # HELP trivy_vulnerabilities Vulnerabilities detected by trivy
 # TYPE trivy_vulnerabilities gauge
 trivy_vulnerabilities{image="gcr.io/spinnaker-marketplace/echo:2.5.1-20190612034009",installedVersion="0.168-1",pkgName="libelf1",severity="HIGH",vulnerabilityId="CVE-2018-16402"} 1
@@ -28,3 +30,17 @@ ac_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx
 ac_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="MEDIUM"} 93
 ac_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="HIGH"} 76
 ac_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="CRITICAL"} 25
+```
+
+### OML
+
+```
+https://github.com/operator-framework/operator-registry/releases/tag/v1.19.5
+https://github.com/operator-framework/learn-operator
+https://operator-framework.github.io/olm-book/docs/packaging-an-operator.html
+
+opm alpha bundle build -c 2.0.0 -t devopstales/trivy-operator-bundle:2.0 -d OLM/2.0.0 -p trivy-operator
+ll OLM/2.0.0
+02_crds.yaml
+clusterserviceversion.yaml
+```
