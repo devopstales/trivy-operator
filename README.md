@@ -15,7 +15,6 @@ Default every 5 minutes execute a scan script. It will get image list from all n
 ### Trivy Image Validator
 The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy if it is in a namespace with the lable `trivy-operator-validation=true`.
 
-
 ## Usage
 
 ```bash
@@ -30,6 +29,8 @@ kubectl apply -f deploy/04_trivy-config.yaml
 ~~~text
 curl -s http://10.43.179.39:9115/metrics | grep so_vulnerabilities
 
+# HELP so_vulnerabilities Container vulnerabilities
+# TYPE so_vulnerabilities gauge
 so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="UNKNOWN"} 0
 so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="LOW"} 23
 so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="MEDIUM"} 93
@@ -40,6 +41,18 @@ so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx
 so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:latest",severity="MEDIUM"} 88
 so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:latest",severity="HIGH"} 60
 so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:latest",severity="CRITICAL"} 8
+~~~
+
+~~~text
+curl -s http://10.43.179.39:9115/metrics | grep ac_vulnerabilities
+
+# HELP ac_vulnerabilities Admission Controller vulnerabilities
+# TYPE ac_vulnerabilities gauge
+ac_vulnerabilities{exported_namespace="trivytest",image="nginxinc/nginx-unprivileged:latest",severity="UNKNOWN"} 0.0
+ac_vulnerabilities{exported_namespace="trivytest",image="nginxinc/nginx-unprivileged:latest",severity="LOW"} 83.0
+ac_vulnerabilities{exported_namespace="trivytest",image="nginxinc/nginx-unprivileged:latest",severity="MEDIUM"} 6.0
+ac_vulnerabilities{exported_namespace="trivytest",image="nginxinc/nginx-unprivileged:latest",severity="HIGH"} 6.0
+ac_vulnerabilities{exported_namespace="trivytest",image="nginxinc/nginx-unprivileged:latest",severity="CRITICAL"} 4.0
 ~~~
 
 
@@ -66,6 +79,12 @@ kubectl logs
 [2021-10-02 09:45:33,881] kopf.objects         [INFO    ] [trivytest/main-config] Scanning Image: docker.io/library/nginx:latest
 [2021-10-02 09:45:52,227] kopf.objects         [INFO    ] [trivytest/main-config] Scanning Image: docker.io/library/nginx:1.18
 [2021-10-02 09:45:55,556] kopf.objects         [INFO    ] [trivytest/main-config] Scanning Image: docker.io/library/nginx:latest
+
+[2021-10-02 18:33:32,742] kopf.objects         [INFO    ] [trivytest/app-85ddd4585b-sdt4t] Admission Controller is working
+[2021-10-02 18:33:32,755] kopf.objects         [INFO    ] [trivytest/app-85ddd4585b-sdt4t] Scanning Image: nginxinc/nginx-unprivileged:latest
+[2021-10-02 18:33:34,967] kopf.objects         [INFO    ] [trivytest/app-85ddd4585b-sdt4t] severity: {'UNKNOWN': 0, 'LOW': 83, 'MEDIUM': 6, 'HIGH':6, 'CRITICAL': 4}
+[2021-10-02 18:33:34,969] kopf.objects         [ERROR   ] [trivytest/app-85ddd4585b-sdt4t] Webhook 'validate1' failed permanently: Too muchvulnerability in the image: nginxinc/nginx-unprivileged:latest
+[2021-10-02 18:33:34,971] aiohttp.access       [INFO    ] 10.244.0.1 [17/Dec/2021:18:33:32 +0000] "POST /validate1?timeout=30s HTTP/1.1" 200 417"-" "kube-apiserver-admission"
 ~~~
 
 ### Example Deploy:
