@@ -188,8 +188,11 @@ async def create_fn(logger, spec, **kwargs):
                 namespace_list = k8s_client.CoreV1Api().list_namespace()
 
                 for ns in namespace_list.items:
-                    ns_label_list = ns.metadata.labels.items()
-                    ns_name = ns.metadata.name
+                    try:
+                        ns_label_list = ns.metadata.labels.items()
+                        ns_name = ns.metadata.name
+                    except:
+                        continue
 
                 """Finf Namespaces with selector tag"""
                 for label_key, label_value in ns_label_list:
@@ -230,7 +233,6 @@ async def create_fn(logger, spec, **kwargs):
                             continue
 
                 """Scan images"""
-                logger.info("%s" % (image_list)) # debug
                 for image in image_list:
                     logger.info("Scanning Image: %s" % (image_list[image][0]))
                     image_name = image_list[image][0]
@@ -274,6 +276,8 @@ async def create_fn(logger, spec, **kwargs):
                             logger.error("You have reached your pull rate limit.")
                         elif b"unsupported MediaType" in error.strip():
                             logger.error("Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
+                        elif b"MANIFEST_UNKNOWN: manifest unknown; map[Tag:latest]" in error.strip():
+                            logger.error("No tag in registry")
                         else:
                             logger.error("%s" % (error.strip()))
                         """Error action"""
@@ -467,3 +471,140 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
 @kopf.on.validate('pod', operation='CREATE')
 def validate1(logger, namespace, name, annotations, spec, **_):
     logger.info("Admission Controller is working")
+    image_list = []
+    vul_list = {}
+    registry_list = {}
+
+    """Try to get Registry auth values"""
+    if IN_CLUSTER:
+        k8s_config.load_incluster_config()
+    else:
+        k8s_config.load_kube_config()
+    try:
+    # if no namespace-scanners created
+      nsScans = k8s_client.CustomObjectsApi().list_cluster_custom_object(
+        group="trivy-operator.devopstales.io",
+        version="v1",
+        plural="namespace-scanners",
+      )
+      for nss in nsScans["items"]:
+          registry_list = nss["spec"]["registry"]
+    except:
+        logger.info("No ns-scan object created yet.")
+
+    """Get conainers"""
+    containers = spec.get('containers')
+    initContainers = spec.get('initContainers')
+
+    try:
+      for icn in initContainers:
+        initContainers_array =  json.dumps(icn)
+        initContainer = json.loads(initContainers_array)
+        image_name = initContainer["image"]
+        image_list.append(image_name)
+    except:
+      print("")
+
+    for cn in containers:
+      container_array =  json.dumps(cn)
+      container = json.loads(container_array)
+      image_name = container["image"]
+      image_list.append(image_name)
+
+    """Get Images"""
+    for image_name in image_list:
+        registry = image_name.split('/')[0]
+        logger.info("Scanning Image: %s" % (image_name))
+
+        """Login to registry"""
+        try:
+            for reg in registry_list:
+                if reg['name'] == registry:
+                    os.environ['DOCKER_REGISTRY']=reg['name']
+                    os.environ['TRIVY_USERNAME']=reg['user']
+                    os.environ['TRIVY_PASSWORD']=reg['password']
+                elif not validators.domain(registry):
+                  """If registry is not an url"""
+                  if reg['name'] == "docker.io":
+                      os.environ['DOCKER_REGISTRY']=reg['name']
+                      os.environ['TRIVY_USERNAME']=reg['user']
+                      os.environ['TRIVY_PASSWORD']=reg['password']
+        except:
+            logger.info("No registry auth config is defined.")
+        ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
+#        logger.info("Active Registry: %s" % (ACTIVE_REGISTRY)) # Debug
+
+        """Scan Images"""
+        TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
+        # --ignore-policy trivy.rego
+
+        res = subprocess.Popen(TRIVY,stdout=subprocess.PIPE,stderr=subprocess.PIPE);
+        output,error = res.communicate()
+        if error:
+            """Error Logging"""
+            logger.error("TRIVY ERROR: return %s" % (res.returncode))
+            if b"401" in error.strip():
+                logger.error("Repository: Unauthorized authentication required")
+            elif b"UNAUTHORIZED" in error.strip():
+                logger.error("Repository: Unauthorized authentication required")
+            elif b"You have reached your pull rate limit." in error.strip():
+                logger.error("You have reached your pull rate limit.")
+            elif b"unsupported MediaType" in error.strip():
+                logger.error("Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
+            elif b"MANIFEST_UNKNOWN: manifest unknown; map[Tag:latest]" in error.strip():
+                logger.error("No tag in registry")
+            else:
+                logger.error("%s" % (error.strip()))
+            """Error action"""
+            se = { "scanning_error": 1 }
+            vul_list[image_name] = [se, namespace]
+
+        elif output:
+            trivy_result = json.loads(output.decode("UTF-8"))
+            item_list = trivy_result['Results'][0]["Vulnerabilities"]
+            vuls = { "UNKNOWN": 0,"LOW": 0,"MEDIUM": 0,"HIGH": 0,"CRITICAL": 0 }
+            for item in item_list:
+                vuls[item["Severity"]] += 1
+            vul_list[image_name] = [vuls, namespace]
+
+        """Generate log"""
+        logger.info("severity: %s" % (vul_list[image_name][0])) # Logging
+
+        """Generate Metricfile"""
+        for image_name in vul_list.keys():
+            for severity in vul_list[image_name][0].keys():
+                AC_VULN.labels(vul_list[image_name][1], image_name, severity).set(int(vul_list[image_name][0][severity]))
+        # logger.info("Prometheus Done") # Debug
+
+        # Get vulnerabilities from annotations
+        vul_annotations= { "UNKNOWN": 0,"LOW": 0,"MEDIUM": 0,"HIGH": 0,"CRITICAL": 0 }
+        for sev in vul_annotations:
+            try:
+#                logger.info("%s: %s" % (sev, annotations['trivy.security.devopstales.io/' + sev.lower()])) # Debug
+                vul_annotations[sev] = annotations['trivy.security.devopstales.io/' + sev.lower()]
+            except:
+                continue
+
+        # Check vulnerabilities
+        # logger.info("Check vulnerabilities:") # Debug
+        if  "scanning_error" in vul_list[image_name][0]:
+            logger.error("Trivy can't scann the image")
+            raise kopf.AdmissionError(f"Trivy can't scann the image: %s" % (image_name))    
+        else:
+            for sev in vul_annotations:
+                an_vul_num = vul_annotations[sev]
+                vul_num = vul_list[image_name][0][sev]                  
+                if int(vul_num) > int(an_vul_num):
+#                    logger.error("%s is bigger" % (sev)) # Debug
+                    raise kopf.AdmissionError(f"Too much vulnerability in the image: %s" % (image_name))
+                else:
+#                    logger.info("%s is ok" % (sev)) # Debug
+                    continue
+
+#############################################################################
+## print to operator log
+# print(f"And here we are! Creating: %s" % (ns_name), file=sys.stderr) # debug
+## message to CR
+#    return {'message': 'hello world'}  # will be the new status
+## events to CR describe
+# kopf.event(body, type="SomeType", reason="SomeReason", message="Some message")
