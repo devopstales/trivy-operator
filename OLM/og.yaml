@@ -2,7 +2,8 @@ apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: test-og
-  namespace: default
+#  namespace: default
 spec:
   targetNamespaces:
-  - default
+#  - default
+  - balazs-paldi

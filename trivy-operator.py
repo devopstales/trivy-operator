@@ -14,21 +14,6 @@ from typing import AsyncIterator, Optional, Tuple, Collection
 from datetime import datetime
 from OpenSSL import crypto
 
-"""
-apiVersion: trivy-operator.devopstales.io/v1
-kind: NamespaceScanner
-metadata:
-  name: main-config
-  namespace: trivy-operator
-spec:
-  crontab: "*/5 * * * *"
-  namespace_selector: "trivy-scan"
-  registry:
-  - name: docker.io
-    user: "user"
-    password: "password"
-"""
-
 #############################################################################
 # ToDo
 #############################################################################
@@ -39,10 +24,15 @@ spec:
 #############################################################################
 # Global Variables
 #############################################################################
-CONTAINER_VULN = prometheus_client.Gauge(
+CONTAINER_VULN_SUM = prometheus_client.Gauge(
     'so_vulnerabilities',
     'Container vulnerabilities',
     ['exported_namespace', 'image', 'severity']
+)
+CONTAINER_VULN = prometheus_client.Gauge(
+    'trivy_vulnerabilities',
+    'Container vulnerabilities',
+    ['exported_namespace', 'image', 'installedVersion', 'pkgName', 'severity', 'vulnerabilityId']
 )
 AC_VULN = prometheus_client.Gauge(
     'ac_vulnerabilities',
@@ -288,13 +278,23 @@ async def create_fn(logger, spec, **kwargs):
                         item_list = trivy_result['Results'][0]["Vulnerabilities"]
                         vuls = { "UNKNOWN": 0,"LOW": 0,"MEDIUM": 0,"HIGH": 0,"CRITICAL": 0 }
                         for item in item_list:
+                            logger.info("%s" % (item)) # debug
+                            # ['exported_namespace', 'image', 'installedVersion', 'pkgName', 'severity', 'vulnerabilityId']
+                            CONTAINER_VULN.labels(
+                                ns_name, 
+                                image_name, 
+                                item["InstalledVersion"], "pkgName",
+                                #item["pkgName"], 
+                                item["Severity"], 
+                                item["VulnerabilityID"]
+                            ).set(1)
                             vuls[item["Severity"]] += 1
                         vul_list[image_name] = [vuls, ns_name]
 
                 """Generate Metricfile"""
                 for image_name in vul_list.keys():
                     for severity in vul_list[image_name][0].keys():
-                        CONTAINER_VULN.labels(
+                        CONTAINER_VULN_SUM.labels(
                             vul_list[image_name][1],
                             image_name, severity).set(int(vul_list[image_name][0][severity])
                         )
