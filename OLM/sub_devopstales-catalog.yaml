@@ -2,12 +2,11 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: trivy-operator
-#  namespace: default
+  namespace: default
 spec:
   channel: stable
   installPlanApproval: Automatic
   name: trivy-operator
   source: devopstales-catalog
-#  sourceNamespace: olm
-  sourceNamespace: balazs-paldi
+  sourceNamespace: olm
   startingCSV: trivy-operator.v2.1.1
