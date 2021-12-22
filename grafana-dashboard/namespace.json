@@ -12,7 +12,7 @@
       }
     ]
   },
-  "description": "Dashboard for Trivy Vulnerabilities",
+  "description": "Dashboard for Trivy Vulnerabilities in Namespace",
   "editable": true,
   "gnetId": 12331,
   "graphTooltip": 0,
@@ -74,7 +74,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"CRITICAL\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"CRITICAL\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -197,7 +197,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"HIGH\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"HIGH\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -320,7 +320,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"MEDIUM\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"MEDIUM\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -443,7 +443,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"LOW\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"LOW\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -566,7 +566,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"UNKNOWN\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"UNKNOWN\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -675,7 +675,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{}) by(severity)",
+          "expr": "sum(trivy_vulnerabilities{}) by(severity)",
           "format": "time_series",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -881,7 +881,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"CRITICAL\"}) by (image,exported_namespace)",
+          "expr": "sum(trivy_vulnerabilities{severity=\"CRITICAL\"}) by (image,exported_namespace)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -890,7 +890,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"HIGH\"}) by (image,exported_namespace)",
+          "expr": "sum(trivy_vulnerabilities{severity=\"HIGH\"}) by (image,exported_namespace)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -945,7 +945,7 @@
     ]
   },
   "timezone": "",
-  "title": "Trivy Vulnerabilities",
-  "uid": "BQnjzl-iz",
+  "title": "Namespace Vulnerabilities",
+  "uid": "BQnjzl-iz1",
   "version": 6
 }
