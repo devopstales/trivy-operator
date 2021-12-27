@@ -1,4 +1,14 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -12,7 +22,7 @@
       }
     ]
   },
-  "description": "Dashboard for Trivy Vulnerabilities",
+  "description": "Dashboard for Trivy Vulnerabilities in Namespace",
   "editable": true,
   "gnetId": 12331,
   "graphTooltip": 0,
@@ -21,7 +31,7 @@
   "panels": [
     {
       "cacheTimeout": null,
-      "datasource": "Prometheus",
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "mappings": [
@@ -74,7 +84,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"CRITICAL\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"CRITICAL\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -144,7 +154,7 @@
     },
     {
       "cacheTimeout": null,
-      "datasource": "Prometheus",
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "mappings": [
@@ -197,7 +207,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"HIGH\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"HIGH\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -267,7 +277,7 @@
     },
     {
       "cacheTimeout": null,
-      "datasource": "Prometheus",
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "mappings": [
@@ -320,7 +330,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"MEDIUM\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"MEDIUM\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -390,7 +400,7 @@
     },
     {
       "cacheTimeout": null,
-      "datasource": "Prometheus",
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "mappings": [
@@ -443,7 +453,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"LOW\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"LOW\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -513,7 +523,7 @@
     },
     {
       "cacheTimeout": null,
-      "datasource": "Prometheus",
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "mappings": [
@@ -566,7 +576,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"UNKNOWN\"})",
+          "expr": "sum(trivy_vulnerabilities{severity=\"UNKNOWN\"})",
           "format": "table",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -642,7 +652,7 @@
         "label": "Severiy",
         "threshold": 0
       },
-      "datasource": "Prometheus",
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -675,7 +685,7 @@
         {
           "dateTimeType": "DATETIME",
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{}) by(severity)",
+          "expr": "sum(trivy_vulnerabilities{}) by(severity)",
           "format": "time_series",
           "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
           "group": [
@@ -738,7 +748,7 @@
     },
     {
       "columns": [],
-      "datasource": "Prometheus",
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -881,7 +891,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"CRITICAL\"}) by (image,exported_namespace)",
+          "expr": "sum(trivy_vulnerabilities{severity=\"CRITICAL\"}) by (image,exported_namespace)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -890,7 +900,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(so_vulnerabilities{severity=\"HIGH\"}) by (image,exported_namespace)",
+          "expr": "sum(trivy_vulnerabilities{severity=\"HIGH\"}) by (image,exported_namespace)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -945,7 +955,7 @@
     ]
   },
   "timezone": "",
-  "title": "Trivy Vulnerabilities",
-  "uid": "BQnjzl-iz",
+  "title": "Namespace Vulnerabilities",
+  "uid": "BQnjzl-iz1",
   "version": 6
 }
