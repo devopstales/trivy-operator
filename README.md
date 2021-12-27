@@ -27,20 +27,29 @@ kubectl apply -f deploy/04_trivy-config.yaml
 ```
 
 ~~~text
-curl -s http://10.43.179.39:9115/metrics | grep so_vulnerabilities
-
-# HELP so_vulnerabilities Container vulnerabilities
-# TYPE so_vulnerabilities gauge
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="UNKNOWN"} 0
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="LOW"} 23
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="MEDIUM"} 93
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="HIGH"} 76
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="CRITICAL"} 25
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:latest",severity="UNKNOWN"} 0
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:latest",severity="LOW"} 23
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:latest",severity="MEDIUM"} 88
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:latest",severity="HIGH"} 60
-so_vulnerabilities{exported_namespace="trivytest",image="docker.io/library/nginx:latest",severity="CRITICAL"} 8
+curl -s http://10.43.179.39:9115/metrics | grep trivy_vulnerabilities
+# HELP trivy_vulnerabilities_sum Container vulnerabilities
+# TYPE trivy_vulnerabilities_sum gauge
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/openshift/mysql-56-centos7:latest",severity="scanning_error"} 1.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",severity="UNKNOWN"} 0.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",severity="LOW"} 83.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",severity="MEDIUM"} 5.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",severity="HIGH"} 7.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",severity="CRITICAL"} 4.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="UNKNOWN"} 0.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="LOW"} 126.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="MEDIUM"} 25.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="HIGH"} 43.0
+trivy_vulnerabilities_sum{exported_namespace="trivytest",image="docker.io/library/nginx:1.18",severity="CRITICAL"} 21.0
+# HELP trivy_vulnerabilities Container vulnerabilities
+# TYPE trivy_vulnerabilities gauge
+trivy_vulnerabilities{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",installedVersion="2.2.4",pkgName="pkgName",severity="LOW",vulnerabilityId="CVE-2011-3374"} 1.0
+trivy_vulnerabilities{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",installedVersion="8.32-4",pkgName="pkgName",severity="LOW",vulnerabilityId="CVE-2016-2781"} 1.0
+trivy_vulnerabilities{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",installedVersion="8.32-4",pkgName="pkgName",severity="LOW",vulnerabilityId="CVE-2017-18018"} 1.0
+trivy_vulnerabilities{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",installedVersion="7.74.0-1.3",pkgName="pkgName",severity="CRITICAL",vulnerabilityId="CVE-2021-22945"} 1.0
+trivy_vulnerabilities{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",installedVersion="7.74.0-1.3",pkgName="pkgName",severity="HIGH",vulnerabilityId="CVE-2021-22946"} 1.0
+trivy_vulnerabilities{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",installedVersion="7.74.0-1.3",pkgName="pkgName",severity="MEDIUM",vulnerabilityId="CVE-2021-22947"} 1.0
+trivy_vulnerabilities{exported_namespace="trivytest",image="docker.io/nginxinc/nginx-unprivileged:latest",installedVersion="7.74.0-1.3",pkgName="pkgName",severity="LOW",vulnerabilityId="CVE-2021-22898"} 1.0
 ~~~
 
 ~~~text
