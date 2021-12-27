@@ -6,6 +6,7 @@ import prometheus_client
 import asyncio
 import pycron
 import os
+import sys
 import subprocess
 import json
 import validators
@@ -278,13 +279,12 @@ async def create_fn(logger, spec, **kwargs):
                         item_list = trivy_result['Results'][0]["Vulnerabilities"]
                         vuls = { "UNKNOWN": 0,"LOW": 0,"MEDIUM": 0,"HIGH": 0,"CRITICAL": 0 }
                         for item in item_list:
-                            logger.info("%s" % (item)) # debug
-                            # ['exported_namespace', 'image', 'installedVersion', 'pkgName', 'severity', 'vulnerabilityId']
+                            #print(item["PkgName"], file=sys.stderr)
                             CONTAINER_VULN.labels(
                                 ns_name, 
                                 image_name, 
-                                item["InstalledVersion"], "pkgName",
-                                #item["pkgName"], 
+                                item["InstalledVersion"], 
+                                item["PkgName"], 
                                 item["Severity"], 
                                 item["VulnerabilityID"]
                             ).set(1)

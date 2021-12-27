@@ -274,7 +274,10 @@
   ],
   "schemaVersion": 22,
   "style": "dark",
-  "tags": [],
+  "tags": [
+    "Trivy",
+    "Prometheus"
+  ],
   "templating": {
     "list": [
       {
@@ -321,7 +324,7 @@
     ]
   },
   "timezone": "",
-  "title": "TNamespace Vulnerabilities - image overview",
+  "title": "Namespace Vulnerabilities - image overview",
   "uid": "VTc2usgGzs",
   "variables": {
     "list": []
