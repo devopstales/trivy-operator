@@ -2,6 +2,10 @@
 
 Built with [kopf](https://github.com/nolar/kopf)
 
+## What is this?
+
+The goal of this project is to provide a vulnerability scanner that continuously scans containers deployed in a Kubernetes cluster.
+
 Main functions:
 
 * Scheduled Image scans on running pods
