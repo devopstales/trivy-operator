@@ -1,23 +1,21 @@
 # Trivy Operator
 
-Built with [kopf](https://github.com/nolar/kopf)
+The goal of this project is to provide a vulnerability scanner that continuously scans containers deployed in a Kubernetes cluster. Built with [kopf](https://github.com/nolar/kopf)
 
-## What is this?
 
-The goal of this project is to provide a vulnerability scanner that continuously scans containers deployed in a Kubernetes cluster.
-
-Main functions:
-
-* Scheduled Image scans on running pods
-* Trivy Image Validator Admission controller
+It works as 
+- Operator
+  - Scheduled Image scans on running pods
+- Admission Controller
+  - protecting unsafe images from being deployed
 
 Inspirated by [knqyf263](https://github.com/knqyf263)'s [trivy-enforcer](https://github.com/aquasecurity/trivy-enforcer) and [fleeto](https://github.com/fleeto)'s [trivy-scanner](https://github.com/fleeto/trivy-scanner).
 
 ### Schefuled Image scans
-Default every 5 minutes execute a scan script. It will get image list from all namespaces with the label `trivy-scan=true`, and then scan this images with trivy, finally we will get metrics on `http://[pod-ip]:9115/metrics`
+Default every 5 minutes execute a scan script. It will get image list from all namespaces with the label `trivy-scan=true`, and then scan these images with trivy. Finally we will get metrics on `http://[pod-ip]:9115/metrics`
 
 ### Trivy Image Validator
-The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy if it is in a namespace with the lable `trivy-operator-validation=true`.
+The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy if it is in a namespace with the label `trivy-operator-validation=true`.
 
 ## Usage
 
@@ -101,7 +99,7 @@ kubectl logs
 ~~~
 
 ### Example Deploy:
-You can define policy to the Admission Controller, by adding annotation to the pod trough the deployment:
+You can define policy to the Admission Controller, by adding annotation to the pod through the deployment:
 
 ```yaml
 spec:
