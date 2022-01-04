@@ -1,15 +1,13 @@
 # Trivy Operator
 
-Built with [kopf](https://github.com/nolar/kopf)
+The goal of this project is to provide a vulnerability scanner that continuously scans containers deployed in a Kubernetes cluster. Built with [kopf](https://github.com/nolar/kopf)
 
-## What is this?
 
-The goal of this project is to provide a vulnerability scanner that continuously scans containers deployed in a Kubernetes cluster.
-
-Main functions:
-
-* Scheduled Image scans on running pods
-* Trivy Image Validator Admission controller
+It works as 
+- Operator
+  - Scheduled Image scans on running pods
+- Admission Controller
+  - protecting unsafe images from being deployed
 
 Inspirated by [knqyf263](https://github.com/knqyf263)'s [trivy-enforcer](https://github.com/aquasecurity/trivy-enforcer) and [fleeto](https://github.com/fleeto)'s [trivy-scanner](https://github.com/fleeto/trivy-scanner).
 
