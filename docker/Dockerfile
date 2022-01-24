@@ -18,6 +18,6 @@ RUN addgroup -S -g 10001 trivy-operator && \
 
 USER 10001:10001
 
-CMD kopf run -A /trivy-operator.py
+CMD kopf run -A /trivy-operator.py --log-format=full
 
 VOLUME [ "/data/trivy", "/data/cache" ]
