@@ -251,6 +251,9 @@ async def create_fn(logger, spec, **kwargs):
                     except:
                         continue
 
+            """No duplicates here"""
+            image_list = list(dict.fromkeys(image_list))
+
             """Scan images"""
             logger.debug("image list begin:")
             logger.debug(format(image_list))
