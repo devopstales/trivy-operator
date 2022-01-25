@@ -575,6 +575,8 @@ def validate1(logger, namespace, name, annotations, spec, **_):
         image_name = container["image"]
         image_list.append(image_name)
 
+    """No duplicates here"""
+    image_list = list(dict.fromkeys(image_list))
     """Get Images"""
     for image_name in image_list:
         registry = image_name.split('/')[0]
