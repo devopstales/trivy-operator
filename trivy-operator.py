@@ -34,7 +34,7 @@ CONTAINER_VULN_SUM = prometheus_client.Gauge(
 CONTAINER_VULN = prometheus_client.Gauge(
     'trivy_vulnerabilities',
     'Container vulnerabilities',
-    ['exported_namespace', 'image', 'installedVersion',
+    ['exported_namespace', 'pod', 'image', 'installedVersion',
         'pkgName', 'severity', 'vulnerabilityId']
 )
 AC_VULN = prometheus_client.Gauge(
@@ -179,7 +179,9 @@ async def create_fn(logger, spec, **kwargs):
     while True:
         if pycron.is_now(crontab):
             """Find Namespaces"""
-            image_list = {}
+            unique_image_list = {}
+            pod_list = {}
+            trivy_result_list = {}
             vul_list = {}
             tagged_ns_list = []
 
@@ -213,12 +215,12 @@ async def create_fn(logger, spec, **kwargs):
 
             """Find pods in namespaces"""
             for tagged_ns in tagged_ns_list:
-                pod_list = k8s_client.CoreV1Api().list_namespaced_pod(tagged_ns)
+                namespaced_pod_list = k8s_client.CoreV1Api().list_namespaced_pod(tagged_ns)
                 logger.debug("pod list begin:")
-                logger.debug(format(pod_list))
+                logger.debug(format(namespaced_pod_list))
                 logger.debug("pod list end:")
                 """Find images in pods"""
-                for pod in pod_list.items:
+                for pod in namespaced_pod_list.items:
                     Containers = pod.status.container_statuses
                     logger.debug("containers begin:")
                     logger.debug(format(Containers))
@@ -227,12 +229,14 @@ async def create_fn(logger, spec, **kwargs):
                         pod_name = pod.metadata.name
                         pod_name += '_'
                         pod_name += image.name
-                        image_list[pod_name] = list()
+                        pod_list[pod_name] = list()
                         image_name = image.image
                         image_id = image.image_id
-                        image_list[pod_name].append(image_name)
-                        image_list[pod_name].append(image_id)
-                        image_list[pod_name].append(tagged_ns)
+                        pod_list[pod_name].append(image_name)
+                        pod_list[pod_name].append(image_id)
+                        pod_list[pod_name].append(tagged_ns)
+
+                        unique_image_list[image_name] = image_name
                     try:
                         initContainers = pod.status.init_container_statuses
                         logger.debug("initContainers begin:")
@@ -242,29 +246,26 @@ async def create_fn(logger, spec, **kwargs):
                             pod_name = pod.metadata.name
                             pod_name += '_'
                             pod_name += image.name
-                            image_list[pod_name] = list()
+                            pod_list[pod_name] = list()
                             image_name = image.image
                             image_id = image.image_id
-                            image_list[pod_name].append(image_name)
-                            image_list[pod_name].append(image_id)
-                            image_list[pod_name].append(tagged_ns)
+                            pod_list[pod_name].append(image_name)
+                            pod_list[pod_name].append(image_id)
+                            pod_list[pod_name].append(tagged_ns)
+
+                            unique_image_list[image_name] = image_name
                     except:
                         continue
 
-            """No duplicates here"""
-            image_list = list(dict.fromkeys(image_list))
-
             """Scan images"""
             logger.debug("image list begin:")
-            logger.debug(format(image_list))
+            logger.debug(format(unique_image_list))
             logger.debug("image list end:")
-            for image in image_list:
-                logger.info("Scanning Image: %s" % (image_list[image][0]))
-                image_name = image_list[image][0]
-                image_id = image_list[image][1]
-                ns_name = image_list[image][2]
-                registry = image_name.split('/')[0]
 
+            for image_name in unique_image_list:
+                logger.info("Scanning Image: %s" % (image_name))
+
+                registry = image_name.split('/')[0]
                 try:
                     registry_list = spec['registry']
 
@@ -311,18 +312,31 @@ async def create_fn(logger, spec, **kwargs):
                     else:
                         logger.error("%s" % (error.strip()))
                     """Error action"""
-                    vuls = {"scanning_error": 1}
-                    vul_list[image_name] = [vuls, ns_name]
+                    trivy_result_list[image_name] = "scanning_error"
                 elif output:
                     trivy_result = json.loads(output.decode("UTF-8"))
-                    vuls = {"UNKNOWN": 0, "LOW": 0,
-                            "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
+                    trivy_result_list[image_name] = trivy_result
+
+            for pod_name in pod_list:
+                logger.info("Assigning scanning result for Pod: %s" % (pod_name))
+                image_name = pod_list[pod_name][0]
+                image_id = pod_list[pod_name][1]
+                ns_name = pod_list[pod_name][2]
+
+                trivy_result = trivy_result_list[image_name]
+                if trivy_result == 'scanning_error':
+                    vuls = {"scanning_error": 1}
+                    vul_list[pod_name] = [vuls, ns_name]
+                else:
                     if 'Vulnerabilities' in trivy_result['Results'][0]:
+                        vuls = {"UNKNOWN": 0, "LOW": 0,
+                                "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
                         item_list = trivy_result['Results'][0]["Vulnerabilities"]
                         for item in item_list:
                             #print(item["PkgName"], file=sys.stderr)
                             CONTAINER_VULN.labels(
                                 ns_name,
+                                pod_name,
                                 image_name,
                                 item["InstalledVersion"],
                                 item["PkgName"],
@@ -330,14 +344,14 @@ async def create_fn(logger, spec, **kwargs):
                                 item["VulnerabilityID"]
                             ).set(1)
                             vuls[item["Severity"]] += 1
-                    vul_list[image_name] = [vuls, ns_name]
+                        vul_list[pod_name] = [vuls, ns_name]
 
             """Generate Metricfile"""
-            for image_name in vul_list.keys():
-                for severity in vul_list[image_name][0].keys():
+            for pod_name in vul_list.keys():
+                for severity in vul_list[pod_name][0].keys():
                     CONTAINER_VULN_SUM.labels(
-                        vul_list[image_name][1],
-                        image_name, severity).set(int(vul_list[image_name][0][severity])
+                        vul_list[pod_name][1],
+                        image_name, severity).set(int(vul_list[pod_name][0][severity])
                                                   )
 
             await asyncio.sleep(15)
@@ -578,8 +592,6 @@ def validate1(logger, namespace, name, annotations, spec, **_):
         image_name = container["image"]
         image_list.append(image_name)
 
-    """No duplicates here"""
-    image_list = list(dict.fromkeys(image_list))
     """Get Images"""
     for image_name in image_list:
         registry = image_name.split('/')[0]
