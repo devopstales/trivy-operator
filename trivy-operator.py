@@ -221,27 +221,34 @@ async def create_fn(logger, spec, **kwargs):
                 logger.debug("pod list end:")
                 """Find images in pods"""
                 for pod in namespaced_pod_list.items:
-                    Containers = pod.status.container_statuses
+                    containers = pod.status.container_statuses
                     logger.debug("containers begin:")
-                    logger.debug(format(Containers))
+                    logger.debug(format(containers))
                     logger.debug("containers end:")
-                    for image in Containers:
-                        pod_name = pod.metadata.name
-                        pod_name += '_'
-                        pod_name += image.name
-                        pod_list[pod_name] = list()
-                        image_name = image.image
-                        image_id = image.image_id
-                        pod_list[pod_name].append(image_name)
-                        pod_list[pod_name].append(image_id)
-                        pod_list[pod_name].append(tagged_ns)
 
-                        unique_image_list[image_name] = image_name
                     try:
-                        initContainers = pod.status.init_container_statuses
-                        logger.debug("initContainers begin:")
-                        logger.debug(format(initContainers))
-                        logger.debug("initContainers end:")
+                        for image in containers:
+                            pod_name = pod.metadata.name
+                            pod_name += '_'
+                            pod_name += image.name
+                            pod_list[pod_name] = list()
+                            image_name = image.image
+                            image_id = image.image_id
+                            pod_list[pod_name].append(image_name)
+                            pod_list[pod_name].append(image_id)
+                            pod_list[pod_name].append(tagged_ns)
+
+                            unique_image_list[image_name] = image_name
+                    except:
+                        logger.info('containers Type is None')
+                        continue
+
+                    initContainers = pod.status.init_container_statuses
+                    logger.debug("initContainers begin:")
+                    logger.debug(format(initContainers))
+                    logger.debug("initContainers end:")
+
+                    try:
                         for image in initContainers:
                             pod_name = pod.metadata.name
                             pod_name += '_'
@@ -324,11 +331,12 @@ async def create_fn(logger, spec, **kwargs):
                 ns_name = pod_list[pod_name][2]
 
                 trivy_result = trivy_result_list[image_name]
-                if trivy_result == 'scanning_error':
+                logger.debug(trivy_result)
+                if trivy_result == "scanning_error":
                     vuls = {"scanning_error": 1}
                     vul_list[pod_name] = [vuls, ns_name]
                 else:
-                    if 'Vulnerabilities' in trivy_result['Results'][0]:
+                    if 'Results' in trivy_result and 'Vulnerabilities' in trivy_result['Results'][0]:
                         vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
                         item_list = trivy_result['Results'][0]["Vulnerabilities"]
@@ -353,7 +361,6 @@ async def create_fn(logger, spec, **kwargs):
                         vul_list[pod_name][1],
                         image_name, severity).set(int(vul_list[pod_name][0][severity])
                                                   )
-
             await asyncio.sleep(15)
         else:
             await asyncio.sleep(15)
@@ -586,11 +593,14 @@ def validate1(logger, namespace, name, annotations, spec, **_):
     except:
         print("")
 
-    for cn in containers:
-        container_array = json.dumps(cn)
-        container = json.loads(container_array)
-        image_name = container["image"]
-        image_list.append(image_name)
+    try:
+        for cn in containers:
+            container_array = json.dumps(cn)
+            container = json.loads(container_array)
+            image_name = container["image"]
+            image_list.append(image_name)
+    except:
+        print("containers is None")
 
     """Get Images"""
     for image_name in image_list:
@@ -678,7 +688,7 @@ def validate1(logger, namespace, name, annotations, spec, **_):
         if "scanning_error" in vul_list[image_name][0]:
             logger.error("Trivy can't scann the image")
             raise kopf.AdmissionError(
-                f"Trivy can't scann the image: %s" % (image_name))
+                f"Trivy can't scan the image: %s" % (image_name))
         else:
             for sev in vul_annotations:
                 an_vul_num = vul_annotations[sev]
