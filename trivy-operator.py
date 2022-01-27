@@ -86,6 +86,9 @@ async def startup_fn_crd(logger, **kwargs):
                             "namespace_selector": k8s_client.V1JSONSchemaProps(
                                 type="string",
                             ),
+                            "clusterWide": k8s_client.V1JSONSchemaProps(
+                                type="string",
+                            ),
                         }
                     )
                 ),
@@ -170,11 +173,22 @@ async def create_fn(logger, spec, **kwargs):
         logger.error("crontab must be set !!!")
         raise kopf.PermanentError("crontab must be set")
 
+    clusterWide = None
     try:
-        namespace_selector = spec['namespace_selector']
+        clusterWide = bool(spec['clusterWide'])
     except:
-        logger.error("namespace_selector must be set !!!")
-        raise kopf.PermanentError("namespace_selector must be set")
+        logger.info("clusterWide is not set, checking namespaceSelector option")
+        clusterWide = False
+
+    namespaceSelector = None
+    try:
+        namespaceSelector = spec['namespace_selector']
+    except:
+        logger.info("namespace_selector is not set")
+
+    if clusterWide == False and namespaceSelector is None:
+        logger.error("Either clusterWide need to be set to 'true' or namespace_selector should be set")
+        raise kopf.PermanentError("Either clusterWide need to be set to 'true' or namespace_selector should be set")
 
     while True:
         if pycron.is_now(crontab):
@@ -206,7 +220,7 @@ async def create_fn(logger, spec, **kwargs):
                 logger.debug(format(ns_name))
                 logger.debug("labels and namespace end")
                 for label_key, label_value in ns_label_list:
-                    if namespace_selector == label_key and bool(label_value) == True:
+                    if clusterWide or (namespaceSelector == label_key and bool(label_value) == True):
                         tagged_ns_list.append(ns_name)
                     else:
                         continue

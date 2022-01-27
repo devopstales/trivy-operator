@@ -37,6 +37,8 @@ spec:
             type: string
           namespace_selector:
             type: string
+          clusterWide:
+            type: string
           spec:
             type: object
             x-kubernetes-preserve-unknown-fields: true
