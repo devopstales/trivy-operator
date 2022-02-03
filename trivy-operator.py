@@ -142,7 +142,7 @@ async def startup_fn_crd(logger, **kwargs):
 
 @kopf.on.startup()
 async def startup_fn_trivy_cache(logger, **kwargs):
-    TRIVY_CACHE = ["trivy", "-q", "-f", "json", "fs", "/opt"]
+    TRIVY_CACHE = ["trivy", "-q", "fs", "-f", "json", "/opt"]
     trivy_cache_result = (
         subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
     )
