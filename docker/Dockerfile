@@ -10,7 +10,8 @@ RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev curl bash
 
 RUN pip3 install --no-cache-dir kopf[dev] kubernetes asyncio pycron prometheus_client oscrypto certvalidator certbuilder validators pyOpenSSL
 
-#RUN apk del rust cargo gcc
+RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev curl bash
+#rust cargo
 
 COPY trivy-operator.py /trivy-operator.py
 COPY trivy /usr/local/bin
