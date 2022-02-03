@@ -1,14 +1,22 @@
-export VERSION="3.0"
-export $(shell sed 's/=.*//' $(cnf))
+export VERSION=2.2
+export TVERSION=0.21.3
 
 .PHONY:	all
 all:	 latest version
 
 .DEFAULT_GOAL := all
 
+trivy:
+	rm -f docker/trivy
+	cp /tmp/trivy docker/trivy
+
 devel:
-    cp trivy-operator.py docker/trivy-operator.py
+	cp trivy-operator.py docker/trivy-operator.py
 	kim build --tag devopstales/trivy-operator:$(VERSION)-devel docker/
+	rm docker/trivy-operator.py
+
+devel-delete:
+	kim image rm devopstales/trivy-operator:$(VERSION)-devel
 
 latest:
 	cp trivy-operator.py docker/trivy-operator.py

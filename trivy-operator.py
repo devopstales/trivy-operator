@@ -185,19 +185,20 @@ async def create_fn(logger, spec, **kwargs):
                     except:
                         continue
 
-                """Finf Namespaces with selector tag"""
-                for label_key, label_value in ns_label_list:
-                    if namespace_selector == label_key and bool(label_value) == True:
-                        tagged_ns_list.append(ns_name)
-                    else:
-                        continue
+                    """Finf Namespaces with selector tag"""
+                    for label_key, label_value in ns_label_list:
+                        if namespace_selector == label_key and bool(label_value) == True:
+                            tagged_ns_list.append(ns_name)
+                        else:
+                            continue
 
                 """Find pods in namespaces"""
                 for tagged_ns in tagged_ns_list:
-                    pod_list = k8s_client.CoreV1Api().list_namespaced_pod(tagged_ns)
+                    namespaced_pod_list = k8s_client.CoreV1Api().list_namespaced_pod(tagged_ns)
                     """Find images in pods"""
-                    for pod in pod_list.items:
+                    for pod in namespaced_pod_list.items:
                         Containers = pod.status.container_statuses
+
                         for image in Containers:
                             pod_name = pod.metadata.name
                             pod_name += '_'
