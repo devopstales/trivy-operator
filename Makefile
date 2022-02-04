@@ -35,10 +35,12 @@ version:
 	docker build -t devopstales/trivy-operator:$(VERSION)-arm64v8 --build-arg ARCH=arm64v8/ docker/ -f docker/Dockerfile-arm
 	rm -f docker/trivy-operator.py
 
-push:
+push-version:
 	docker push devopstales/trivy-operator:$(VERSION)
 	docker push devopstales/trivy-operator:$(VERSION)-arm32v7
 	docker push devopstales/trivy-operator:$(VERSION)-arm64v8
+
+push-latest:
 	docker manifest create devopstales/trivy-operator:latest \
 		--amend devopstales/trivy-operator:$(VERSION) \
 		--amend devopstales/trivy-operator:$(VERSION)-arm32v7 \
