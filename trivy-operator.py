@@ -164,11 +164,13 @@ async def startup_fn_prometheus_client(logger, **kwargs):
 
 
 @kopf.on.create('trivy-operator.devopstales.io', 'v1', 'namespace-scanners')
-async def create_fn(logger, spec, **kwargs):
+async def create_fn( logger, spec, **kwargs):
     logger.info("NamespaceScanner Created")
 
     try:
         crontab = spec['crontab']
+        logger.debug("namespace-scanners - crontab:")
+        logger.debug(format(crontab))
     except:
         logger.error("crontab must be set !!!")
         raise kopf.PermanentError("crontab must be set")
@@ -176,6 +178,8 @@ async def create_fn(logger, spec, **kwargs):
     clusterWide = None
     try:
         clusterWide = bool(spec['clusterWide'])
+        logger.debug("namespace-scanners - clusterWide:")
+        logger.debug(format(clusterWide))
     except:
         logger.info("clusterWide is not set, checking namespaceSelector option")
         clusterWide = False
@@ -183,6 +187,8 @@ async def create_fn(logger, spec, **kwargs):
     namespaceSelector = None
     try:
         namespaceSelector = spec['namespace_selector']
+        logger.debug("namespace-scanners - namespace_selector:")
+        logger.debug(format(namespaceSelector))
     except:
         logger.info("namespace_selector is not set")
 
@@ -230,15 +236,9 @@ async def create_fn(logger, spec, **kwargs):
             """Find pods in namespaces"""
             for tagged_ns in tagged_ns_list:
                 namespaced_pod_list = k8s_client.CoreV1Api().list_namespaced_pod(tagged_ns)
-                logger.debug("pod list begin:")
-                logger.debug(format(namespaced_pod_list))
-                logger.debug("pod list end:")
                 """Find images in pods"""
                 for pod in namespaced_pod_list.items:
                     containers = pod.status.container_statuses
-                    logger.debug("containers begin:")
-                    logger.debug(format(containers))
-                    logger.debug("containers end:")
 
                     try:
                         for image in containers:
@@ -253,14 +253,15 @@ async def create_fn(logger, spec, **kwargs):
                             pod_list[pod_name].append(tagged_ns)
 
                             unique_image_list[image_name] = image_name
+                            logger.debug("containers begin:")
+                            logger.debug(format(pod_name))
+                            logger.debug(format(pod_list[pod_name]))
+                            logger.debug("containers end:")
                     except:
                         logger.info('containers Type is None')
                         continue
 
                     initContainers = pod.status.init_container_statuses
-                    logger.debug("initContainers begin:")
-                    logger.debug(format(initContainers))
-                    logger.debug("initContainers end:")
 
                     try:
                         for image in initContainers:
@@ -275,14 +276,15 @@ async def create_fn(logger, spec, **kwargs):
                             pod_list[pod_name].append(tagged_ns)
 
                             unique_image_list[image_name] = image_name
+                            logger.debug("InitContainers begin:")
+                            logger.debug(format(pod_name))
+                            logger.debug(format(pod_list[pod_name]))
+                            logger.debug("InitContainers end:")
                     except:
                         continue
 
             """Scan images"""
-            logger.debug("image list begin:")
-            logger.debug(format(unique_image_list))
-            logger.debug("image list end:")
-
+            logger.info("image list begin:")
             for image_name in unique_image_list:
                 logger.info("Scanning Image: %s" % (image_name))
 
@@ -337,15 +339,17 @@ async def create_fn(logger, spec, **kwargs):
                 elif output:
                     trivy_result = json.loads(output.decode("UTF-8"))
                     trivy_result_list[image_name] = trivy_result
+            logger.info("image list end:")
+
 
             for pod_name in pod_list:
-                logger.info("Assigning scanning result for Pod: %s" % (pod_name))
+                logger.debug("Assigning scanning result for Pod: %s" % (pod_name))
                 image_name = pod_list[pod_name][0]
                 image_id = pod_list[pod_name][1]
                 ns_name = pod_list[pod_name][2]
 
                 trivy_result = trivy_result_list[image_name]
-                logger.debug(trivy_result)
+                #logger.debug(trivy_result)
                 if trivy_result == "scanning_error":
                     vuls = {"scanning_error": 1}
                     vul_list[pod_name] = [vuls, ns_name]
@@ -519,7 +523,7 @@ def configure(settings: kopf.OperatorSettings, logger, **_):
                                   'WARNING': logging.WARNING,
                                   'ERROR': logging.ERROR,
                                  }
-            log_level = os.environ.get("LOG_LEVEL", "trivy-operator")
+            log_level = os.environ.get("LOG_LEVEL", "INFO")
             settings.posting.level = log_level_info_map.get(log_level, logging.INFO)
 
             namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
