@@ -31,8 +31,8 @@ devel-delete:
 version:
 	cp trivy-operator.py docker/trivy-operator.py
 	docker build -t devopstales/trivy-operator:$(VERSION) docker/
-	docker build -t devopstales/trivy-operator:$(VERSION)-arm32v7 --build-arg ARCH=arm32v7/ docker/ -f docker/Dockerfile-arm
-	docker build -t devopstales/trivy-operator:$(VERSION)-arm64v8 --build-arg ARCH=arm64v8/ docker/ -f docker/Dockerfile-arm
+	docker build -t devopstales/trivy-operator:$(VERSION)-arm32v7 --build-arg ARCH=arm32v7/ docker/ -f docker/Dockerfile
+	docker build -t devopstales/trivy-operator:$(VERSION)-arm64v8 --build-arg ARCH=arm64v8/ docker/ -f docker/Dockerfile
 	rm -f docker/trivy-operator.py
 
 push-version:
