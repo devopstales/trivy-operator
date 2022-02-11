@@ -5,9 +5,11 @@ ENV TRIVY_CACHE_DIR=/home/trivy-operator/trivy-cache \
     TRIVY_QUIET=true \
     IN_CLUSTER=true
 
+ENV VULN_PACKAGES expat
+
 COPY entrypoint.sh /entrypoint.sh
 
-RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev curl bash rust cargo
+RUN apk add -u --no-cache $VULN_PACKAGES gcc musl-dev libffi-dev openssl-dev curl bash rust cargo
 
 RUN pip3 install --no-cache-dir kopf[dev] kubernetes asyncio pycron prometheus_client oscrypto certvalidator certbuilder validators pyOpenSSL
 
