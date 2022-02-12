@@ -1,6 +1,5 @@
 SHELL=/bin/bash -o pipefail
 export VERSION=2.3
-export TVERSION=0.21.3
 
 .PHONY:	all
 all:	 latest version
