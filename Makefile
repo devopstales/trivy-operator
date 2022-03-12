@@ -1,4 +1,4 @@
-SHELL=/bin/bash -o pipefail
+codeSHELL=/bin/bash -o pipefail
 export VERSION=2.3
 
 .PHONY:	all
@@ -29,19 +29,26 @@ devel-delete:
 
 version:
 	cp trivy-operator.py docker/trivy-operator.py
-	docker build -t devopstales/trivy-operator:$(VERSION) docker/
-	docker build -t devopstales/trivy-operator:$(VERSION)-arm32v7 --build-arg ARCH=arm32v7/ docker/ -f docker/Dockerfile
-	docker build -t devopstales/trivy-operator:$(VERSION)-arm64v8 --build-arg ARCH=arm64v8/ docker/ -f docker/Dockerfile
+	docker build -t devopstales/trivy-operator:$(VERSION)-amd64 --build-arg ARCH=amd64/ docker/
+	docker build -t devopstales/trivy-operator:$(VERSION)-arm64v8 --build-arg ARCH=arm64v8/ docker/
 	rm -f docker/trivy-operator.py
+#	docker build -t devopstales/trivy-operator:$(VERSION)-arm32v7 --build-arg ARCH=arm32v7/ docker/
+
 
 push-version:
-	docker push devopstales/trivy-operator:$(VERSION)
-	docker push devopstales/trivy-operator:$(VERSION)-arm32v7
+	docker push devopstales/trivy-operator:$(VERSION)-amd64
 	docker push devopstales/trivy-operator:$(VERSION)-arm64v8
+	docker manifest create devopstales/trivy-operator:$(VERSION) \
+		--amend devopstales/trivy-operator:$(VERSION)-amd64 \
+		--amend devopstales/trivy-operator:$(VERSION)-arm64v8
+	docker manifest push devopstales/trivy-operator:$(VERSION)
+
+#	docker push devopstales/trivy-operator:$(VERSION)-arm32v7
 
 push-latest:
 	docker manifest create devopstales/trivy-operator:latest \
-		--amend devopstales/trivy-operator:$(VERSION) \
-		--amend devopstales/trivy-operator:$(VERSION)-arm32v7 \
+		--amend devopstales/trivy-operator:$(VERSION)-amd64 \
 		--amend devopstales/trivy-operator:$(VERSION)-arm64v8
 	docker manifest push devopstales/trivy-operator:latest
+
+# 		--amend devopstales/trivy-operator:$(VERSION)-arm32v7 \

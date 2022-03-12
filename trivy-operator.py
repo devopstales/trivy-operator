@@ -44,6 +44,7 @@ AC_VULN = prometheus_client.Gauge(
 )
 IN_CLUSTER = os.getenv("IN_CLUSTER", False)
 IS_GLOBAL = os.getenv("IS_GLOBAL", False)
+IS_AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False)
 
 #############################################################################
 # Pretasks
@@ -51,9 +52,10 @@ IS_GLOBAL = os.getenv("IS_GLOBAL", False)
 
 """Deploy CRDs"""
 
-
 @kopf.on.startup()
 async def startup_fn_crd(logger, **kwargs):
+
+    # namespace-scanner
     scanner_crd = k8s_client.V1CustomResourceDefinition(
         api_version="apiextensions.k8s.io/v1",
         kind="CustomResourceDefinition",
@@ -139,7 +141,6 @@ async def startup_fn_crd(logger, **kwargs):
 
 """Download trivy cache """
 
-
 @kopf.on.startup()
 async def startup_fn_trivy_cache(logger, **kwargs):
     TRIVY_CACHE = ["trivy", "-q", "fs", "-f", "json", "/opt"]
@@ -149,7 +150,6 @@ async def startup_fn_trivy_cache(logger, **kwargs):
     logger.info("trivy cache created...")
 
 """Start Prometheus Exporter"""
-
 
 @kopf.on.startup()
 async def startup_fn_prometheus_client(logger, **kwargs):
@@ -387,337 +387,343 @@ async def create_fn( logger, spec, **kwargs):
 # Admission Controller
 #############################################################################
 
-if IN_CLUSTER:
-    class ServiceTunnel:
-        async def __call__(
-            self, fn: kopf.WebhookFn
-        ) -> AsyncIterator[kopf.WebhookClientConfig]:
-            # https://github.com/kubernetes-client/python/issues/363
-            # Use field reference to environment variable instad
-            namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
-            name = "trivy-image-validator"
-            service_port = int(443)
-            container_port = int(8443)
-            server = kopf.WebhookServer(
-                port=container_port, host=f"{name}.{namespace}.svc")
-            async for client_config in server(fn):
-                client_config["url"] = None
-                client_config["service"] = kopf.WebhookClientConfigService(
-                    name=name, namespace=namespace, port=service_port
+if IS_AC_ENABLED:
+    if IN_CLUSTER:
+        class ServiceTunnel:
+            async def __call__(
+                self, fn: kopf.WebhookFn
+            ) -> AsyncIterator[kopf.WebhookClientConfig]:
+                # https://github.com/kubernetes-client/python/issues/363
+                # Use field reference to environment variable instad
+                namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+                name = "trivy-image-validator"
+                service_port = int(443)
+                container_port = int(8443)
+                server = kopf.WebhookServer(
+                    port=container_port, host=f"{name}.{namespace}.svc")
+                async for client_config in server(fn):
+                    client_config["url"] = None
+                    client_config["service"] = kopf.WebhookClientConfigService(
+                        name=name, namespace=namespace, port=service_port
+                    )
+                    yield client_config
+
+        def build_certificate(
+            logger,
+            hostname: Collection[str],
+            password: Optional[str] = None,
+        ) -> Tuple[bytes, bytes]:
+            """
+            https://github.com/nolar/kopf/blob/7ba1771306df7db9fa654c2c9bc7983eb5d5061b/kopf/_kits/webhooks.py#L344
+            For a self-signed certificate, the CA bundle is the certificate itself
+            """
+            try:
+                import certbuilder
+                import oscrypto.asymmetric
+            except ImportError:
+                logger.error("Need certbuilder")
+
+            # Build a certificate as the framework believe is good enough for itself.
+            subject = {'common_name': hostname[0]}
+            public_key, private_key = oscrypto.asymmetric.generate_pair(
+                'rsa', bit_size=2048)
+            builder = certbuilder.CertificateBuilder(subject, public_key)
+            builder.ca = True
+            builder.key_usage = {'digital_signature',
+                                'key_encipherment', 'key_cert_sign', 'crl_sign'}
+            builder.extended_key_usage = {'server_auth', 'client_auth'}
+            builder.self_signed = True
+            builder.subject_alt_domains = list(hostname)
+            certificate = builder.build(private_key)
+            cert_pem = certbuilder.pem_armor_certificate(certificate)
+            pkey_pem = oscrypto.asymmetric.dump_private_key(
+                private_key, password, target_ms=10)
+            return cert_pem, pkey_pem
+
+        def gen_cert_and_vwc(logger, hostname, cert_file, key_file):
+            # Generate cert
+            logger.info("Generating a self-signed certificate for HTTPS.")
+            certdata, pkeydata = build_certificate(logger, [hostname, "localhost"])
+            # write to file
+            certf = open(cert_file, "w+")
+            certf.write(str(certdata.decode('ascii')))
+            certf.close()
+            pkeyf = open(key_file, "w+")
+            pkeyf.write(str(pkeydata.decode('ascii')))
+            pkeyf.close()
+            caBundle = base64.b64encode(certdata).decode('ascii')
+
+            # Create own ValidatingWebhookConfiguration
+            with k8s_client.ApiClient() as api_client:
+                api_instance = k8s_client.AdmissionregistrationV1Api(api_client)
+                body = k8s_client.V1ValidatingWebhookConfiguration(
+                    api_version='admissionregistration.k8s.io/v1',
+                    kind='ValidatingWebhookConfiguration',
+                    metadata=k8s_client.V1ObjectMeta(
+                        name='trivy-image-validator.devopstales.io'),
+                    webhooks=[k8s_client.V1ValidatingWebhook(
+                        client_config=k8s_client.AdmissionregistrationV1WebhookClientConfig(
+                            ca_bundle=caBundle,
+                            service=k8s_client.AdmissionregistrationV1ServiceReference(
+                                name="trivy-image-validator",
+                                namespace=os.environ.get(
+                                    "POD_NAMESPACE", "trivy-operator"),
+                                path="/validate1",
+                                port=443
+                            )
+                        ),
+                        admission_review_versions=["v1beta1", "v1"],
+                        failure_policy="Fail",
+                        match_policy="Equivalent",
+                        name='validate1.trivy-image-validator.devopstales.io',
+                        namespace_selector=k8s_client.V1LabelSelector(
+                            match_labels={"trivy-operator-validation": "true"}
+                        ),
+                        rules=[k8s_client.V1RuleWithOperations(
+                            api_groups=[""],
+                            api_versions=["v1"],
+                            operations=["CREATE"],
+                            resources=["pods"],
+                            scope="*"
+                        )],
+                        side_effects="None",
+                        timeout_seconds=30
+                    )]
                 )
-                yield client_config
-
-    def build_certificate(
-        logger,
-        hostname: Collection[str],
-        password: Optional[str] = None,
-    ) -> Tuple[bytes, bytes]:
-        """
-        https://github.com/nolar/kopf/blob/7ba1771306df7db9fa654c2c9bc7983eb5d5061b/kopf/_kits/webhooks.py#L344
-        For a self-signed certificate, the CA bundle is the certificate itself
-        """
-        try:
-            import certbuilder
-            import oscrypto.asymmetric
-        except ImportError:
-            logger.error("Need certbuilder")
-
-        # Build a certificate as the framework believe is good enough for itself.
-        subject = {'common_name': hostname[0]}
-        public_key, private_key = oscrypto.asymmetric.generate_pair(
-            'rsa', bit_size=2048)
-        builder = certbuilder.CertificateBuilder(subject, public_key)
-        builder.ca = True
-        builder.key_usage = {'digital_signature',
-                             'key_encipherment', 'key_cert_sign', 'crl_sign'}
-        builder.extended_key_usage = {'server_auth', 'client_auth'}
-        builder.self_signed = True
-        builder.subject_alt_domains = list(hostname)
-        certificate = builder.build(private_key)
-        cert_pem = certbuilder.pem_armor_certificate(certificate)
-        pkey_pem = oscrypto.asymmetric.dump_private_key(
-            private_key, password, target_ms=10)
-        return cert_pem, pkey_pem
-
-    def gen_cert_and_vwc(logger, hostname, cert_file, key_file):
-        # Generate cert
-        logger.info("Generating a self-signed certificate for HTTPS.")
-        certdata, pkeydata = build_certificate(logger, [hostname, "localhost"])
-        # write to file
-        certf = open(cert_file, "w+")
-        certf.write(str(certdata.decode('ascii')))
-        certf.close()
-        pkeyf = open(key_file, "w+")
-        pkeyf.write(str(pkeydata.decode('ascii')))
-        pkeyf.close()
-        caBundle = base64.b64encode(certdata).decode('ascii')
-
-        # Create own ValidatingWebhookConfiguration
-        with k8s_client.ApiClient() as api_client:
-            api_instance = k8s_client.AdmissionregistrationV1Api(api_client)
-            body = k8s_client.V1ValidatingWebhookConfiguration(
-                api_version='admissionregistration.k8s.io/v1',
-                kind='ValidatingWebhookConfiguration',
-                metadata=k8s_client.V1ObjectMeta(
-                    name='trivy-image-validator.devopstales.io'),
-                webhooks=[k8s_client.V1ValidatingWebhook(
-                    client_config=k8s_client.AdmissionregistrationV1WebhookClientConfig(
-                        ca_bundle=caBundle,
-                        service=k8s_client.AdmissionregistrationV1ServiceReference(
-                            name="trivy-image-validator",
-                            namespace=os.environ.get(
-                                "POD_NAMESPACE", "trivy-operator"),
-                            path="/validate1",
-                            port=443
-                        )
-                    ),
-                    admission_review_versions=["v1beta1", "v1"],
-                    failure_policy="Fail",
-                    match_policy="Equivalent",
-                    name='validate1.trivy-image-validator.devopstales.io',
-                    namespace_selector=k8s_client.V1LabelSelector(
-                        match_labels={"trivy-operator-validation": "true"}
-                    ),
-                    rules=[k8s_client.V1RuleWithOperations(
-                        api_groups=[""],
-                        api_versions=["v1"],
-                        operations=["CREATE"],
-                        resources=["pods"],
-                        scope="*"
-                    )],
-                    side_effects="None",
-                    timeout_seconds=30
-                )]
-            )
-        pretty = 'true'
-        field_manager = 'trivy-operator'
-        try:
-            api_response = api_instance.create_validating_webhook_configuration(
-                body, pretty=pretty, field_manager=field_manager)
-        except ApiException as e:
-            if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
-                logger.info(
-                    "validating webhook configuration already exists!!!")
-            else:
-                logger.error(
-                    "Exception when calling AdmissionregistrationV1Api->create_validating_webhook_configuration: %s\n" % e)
+            pretty = 'true'
+            field_manager = 'trivy-operator'
+            try:
+                api_response = api_instance.create_validating_webhook_configuration(
+                    body, pretty=pretty, field_manager=field_manager)
+            except ApiException as e:
+                if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
+                    logger.info(
+                        "validating webhook configuration already exists!!!")
+                else:
+                    logger.error(
+                        "Exception when calling AdmissionregistrationV1Api->create_validating_webhook_configuration: %s\n" % e)
 
 #############################################################################
 
+"""Admission Server Creation"""
 
-@kopf.on.startup()
-def configure(settings: kopf.OperatorSettings, logger, **_):
-    # Auto-detect the best server (K3d/Minikube/simple):
-    if IN_CLUSTER:
-        if IS_GLOBAL:
-            logger.info("Start admission server")
-            settings.admission.server = ServiceTunnel()
-            # Automaticle create ValidatingWebhookConfiguration
-            settings.admission.managed = 'trivy-image-validator.devopstales.io'
-        else:
-            logger.info("Loading cluster config")
-            k8s_config.load_incluster_config()
-
-            log_level_info_map = {'DEBUG': logging.DEBUG,
-                                  'INFO': logging.INFO,
-                                  'WARNING': logging.WARNING,
-                                  'ERROR': logging.ERROR,
-                                 }
-            log_level = os.environ.get("LOG_LEVEL", "INFO")
-            settings.posting.level = log_level_info_map.get(log_level, logging.INFO)
-
-            namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
-            name = "trivy-image-validator"
-            hostname = f"{name}.{namespace}.svc"
-            cert_file = "/home/trivy-operator/trivy-cache/cert.pem"
-            key_file = "/home/trivy-operator/trivy-cache/key.pem"
-
-            if os.path.exists(cert_file):
-                certfile = open(cert_file).read()
-                cert = crypto.load_certificate(crypto.FILETYPE_PEM, certfile)
-                certExpires = datetime.strptime(
-                    str(cert.get_notAfter(), "ascii"), "%Y%m%d%H%M%SZ")
-                daysToExpiration = (certExpires - datetime.now()).days
-                logger.info("Day to certifiacet expiration: %s" %
-                            daysToExpiration)  # debug
-                if daysToExpiration <= 7:  # debug 365
-                    logger.warning("Certificate Expires soon. Regenerating.")
-                    # delete cert file
-                    os.remove(cert_file)
-                    os.remove(key_file)
-                    # delete validating webhook configuration
-                    with k8s_client.ApiClient() as api_client:
-                        api_instance = k8s_client.AdmissionregistrationV1Api(
-                            api_client)
-                        name = 'trivy-image-validator.devopstales.io'
-                        try:
-                            api_response = api_instance.delete_validating_webhook_configuration(
-                                name)
-                        except ApiException as e:
-                            logger.error(
-                                "Exception when calling AdmissionregistrationV1Api->delete_validating_webhook_configuration: %s\n" % e)
-                    # gen cert and vwc
-                    gen_cert_and_vwc(logger, hostname, cert_file, key_file)
+if IS_AC_ENABLED:
+    @kopf.on.startup()
+    def configure(settings: kopf.OperatorSettings, logger, **_):
+        # Auto-detect the best server (K3d/Minikube/simple):
+        if IN_CLUSTER:
+            if IS_GLOBAL:
+                logger.info("Start admission server")
+                settings.admission.server = ServiceTunnel()
+                # Automaticle create ValidatingWebhookConfiguration
+                settings.admission.managed = 'trivy-image-validator.devopstales.io'
             else:
-                gen_cert_and_vwc(logger, hostname, cert_file, key_file)
+                logger.info("Loading cluster config")
+                k8s_config.load_incluster_config()
 
-            # Start Admission Server
-            settings.admission.server = kopf.WebhookServer(
-                port=8443,
-                host=hostname,
-                certfile=cert_file,
-                pkeyfile=key_file
-            )
+                log_level_info_map = {'DEBUG': logging.DEBUG,
+                                    'INFO': logging.INFO,
+                                    'WARNING': logging.WARNING,
+                                    'ERROR': logging.ERROR,
+                                    }
+                log_level = os.environ.get("LOG_LEVEL", "INFO")
+                settings.posting.level = log_level_info_map.get(log_level, logging.INFO)
 
-    else:
-        settings.admission.server = kopf.WebhookAutoServer(port=443)
-        settings.admission.managed = 'trivy-image-validator.devopstales.io'
+                namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+                name = "trivy-image-validator"
+                hostname = f"{name}.{namespace}.svc"
+                cert_file = "/home/trivy-operator/trivy-cache/cert.pem"
+                key_file = "/home/trivy-operator/trivy-cache/key.pem"
+
+                if os.path.exists(cert_file):
+                    certfile = open(cert_file).read()
+                    cert = crypto.load_certificate(crypto.FILETYPE_PEM, certfile)
+                    certExpires = datetime.strptime(
+                        str(cert.get_notAfter(), "ascii"), "%Y%m%d%H%M%SZ")
+                    daysToExpiration = (certExpires - datetime.now()).days
+                    logger.info("Day to certifiacet expiration: %s" %
+                                daysToExpiration)  # debug
+                    if daysToExpiration <= 7:  # debug 365
+                        logger.warning("Certificate Expires soon. Regenerating.")
+                        # delete cert file
+                        os.remove(cert_file)
+                        os.remove(key_file)
+                        # delete validating webhook configuration
+                        with k8s_client.ApiClient() as api_client:
+                            api_instance = k8s_client.AdmissionregistrationV1Api(
+                                api_client)
+                            name = 'trivy-image-validator.devopstales.io'
+                            try:
+                                api_response = api_instance.delete_validating_webhook_configuration(
+                                    name)
+                            except ApiException as e:
+                                logger.error(
+                                    "Exception when calling AdmissionregistrationV1Api->delete_validating_webhook_configuration: %s\n" % e)
+                        # gen cert and vwc
+                        gen_cert_and_vwc(logger, hostname, cert_file, key_file)
+                else:
+                    gen_cert_and_vwc(logger, hostname, cert_file, key_file)
+
+                # Start Admission Server
+                settings.admission.server = kopf.WebhookServer(
+                    port=8443,
+                    host=hostname,
+                    certfile=cert_file,
+                    pkeyfile=key_file
+                )
+
+        else:
+            settings.admission.server = kopf.WebhookAutoServer(port=443)
+            settings.admission.managed = 'trivy-image-validator.devopstales.io'
 
 
-@kopf.on.validate('pod', operation='CREATE')
-def validate1(logger, namespace, name, annotations, spec, **_):
-    logger.info("Admission Controller is working")
-    image_list = []
-    vul_list = {}
-    registry_list = {}
+"""Admission Controller"""
 
-    """Try to get Registry auth values"""
-    if IN_CLUSTER:
-        k8s_config.load_incluster_config()
-    else:
-        k8s_config.load_kube_config()
-    try:
-        # if no namespace-scanners created
-        nsScans = k8s_client.CustomObjectsApi().list_cluster_custom_object(
-            group="trivy-operator.devopstales.io",
-            version="v1",
-            plural="namespace-scanners",
-        )
-        for nss in nsScans["items"]:
-            registry_list = nss["spec"]["registry"]
-    except:
-        logger.info("No ns-scan object created yet.")
+if IS_AC_ENABLED:
+    @kopf.on.validate('pod', operation='CREATE')
+    def validate1(logger, namespace, name, annotations, spec, **_):
+        logger.info("Admission Controller is working")
+        image_list = []
+        vul_list = {}
+        registry_list = {}
 
-    """Get conainers"""
-    containers = spec.get('containers')
-    initContainers = spec.get('initContainers')
-
-    try:
-        for icn in initContainers:
-            initContainers_array = json.dumps(icn)
-            initContainer = json.loads(initContainers_array)
-            image_name = initContainer["image"]
-            image_list.append(image_name)
-    except:
-        print("")
-
-    try:
-        for cn in containers:
-            container_array = json.dumps(cn)
-            container = json.loads(container_array)
-            image_name = container["image"]
-            image_list.append(image_name)
-    except:
-        print("containers is None")
-
-    """Get Images"""
-    for image_name in image_list:
-        registry = image_name.split('/')[0]
-        logger.info("Scanning Image: %s" % (image_name))
-
-        """Login to registry"""
+        """Try to get Registry auth values"""
+        if IN_CLUSTER:
+            k8s_config.load_incluster_config()
+        else:
+            k8s_config.load_kube_config()
         try:
-            for reg in registry_list:
-                if reg['name'] == registry:
-                    os.environ['DOCKER_REGISTRY'] = reg['name']
-                    os.environ['TRIVY_USERNAME'] = reg['user']
-                    os.environ['TRIVY_PASSWORD'] = reg['password']
-                elif not validators.domain(registry):
-                    """If registry is not an url"""
-                    if reg['name'] == "docker.io":
+            # if no namespace-scanners created
+            nsScans = k8s_client.CustomObjectsApi().list_cluster_custom_object(
+                group="trivy-operator.devopstales.io",
+                version="v1",
+                plural="namespace-scanners",
+            )
+            for nss in nsScans["items"]:
+                registry_list = nss["spec"]["registry"]
+        except:
+            logger.info("No ns-scan object created yet.")
+
+        """Get conainers"""
+        containers = spec.get('containers')
+        initContainers = spec.get('initContainers')
+
+        try:
+            for icn in initContainers:
+                initContainers_array = json.dumps(icn)
+                initContainer = json.loads(initContainers_array)
+                image_name = initContainer["image"]
+                image_list.append(image_name)
+        except:
+            print("")
+
+        try:
+            for cn in containers:
+                container_array = json.dumps(cn)
+                container = json.loads(container_array)
+                image_name = container["image"]
+                image_list.append(image_name)
+        except:
+            print("containers is None")
+
+        """Get Images"""
+        for image_name in image_list:
+            registry = image_name.split('/')[0]
+            logger.info("Scanning Image: %s" % (image_name))
+
+            """Login to registry"""
+            try:
+                for reg in registry_list:
+                    if reg['name'] == registry:
                         os.environ['DOCKER_REGISTRY'] = reg['name']
                         os.environ['TRIVY_USERNAME'] = reg['user']
                         os.environ['TRIVY_PASSWORD'] = reg['password']
-        except:
-            logger.info("No registry auth config is defined.")
-        ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
-        logger.debug("Active Registry: %s" % (ACTIVE_REGISTRY))
-
-        """Scan Images"""
-        TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
-        # --ignore-policy trivy.rego
-
-        res = subprocess.Popen(
-            TRIVY, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output, error = res.communicate()
-        if error:
-            """Error Logging"""
-            logger.error("TRIVY ERROR: return %s" % (res.returncode))
-            if b"401" in error.strip():
-                logger.error(
-                    "Repository: Unauthorized authentication required")
-            elif b"UNAUTHORIZED" in error.strip():
-                logger.error(
-                    "Repository: Unauthorized authentication required")
-            elif b"You have reached your pull rate limit." in error.strip():
-                logger.error("You have reached your pull rate limit.")
-            elif b"unsupported MediaType" in error.strip():
-                logger.error(
-                    "Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
-            elif b"MANIFEST_UNKNOWN: manifest unknown; map[Tag:latest]" in error.strip():
-                logger.error("No tag in registry")
-            else:
-                logger.error("%s" % (error.strip()))
-            """Error action"""
-            se = {"scanning_error": 1}
-            vul_list[image_name] = [se, namespace]
-
-        elif output:
-            trivy_result = json.loads(output.decode("UTF-8"))
-            item_list = trivy_result['Results'][0]["Vulnerabilities"]
-            vuls = {"UNKNOWN": 0, "LOW": 0,
-                    "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
-            for item in item_list:
-                vuls[item["Severity"]] += 1
-            vul_list[image_name] = [vuls, namespace]
-
-        """Generate log"""
-        logger.info("severity: %s" % (vul_list[image_name][0]))  # Logging
-
-        """Generate Metricfile"""
-        for image_name in vul_list.keys():
-            for severity in vul_list[image_name][0].keys():
-                AC_VULN.labels(vul_list[image_name][1], image_name, severity).set(
-                    int(vul_list[image_name][0][severity]))
-        # logger.info("Prometheus Done") # Debug
-
-        # Get vulnerabilities from annotations
-        vul_annotations = {"UNKNOWN": 0, "LOW": 0,
-                           "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
-        for sev in vul_annotations:
-            try:
-                #                logger.info("%s: %s" % (sev, annotations['trivy.security.devopstales.io/' + sev.lower()])) # Debug
-                vul_annotations[sev] = annotations['trivy.security.devopstales.io/' + sev.lower()]
+                    elif not validators.domain(registry):
+                        """If registry is not an url"""
+                        if reg['name'] == "docker.io":
+                            os.environ['DOCKER_REGISTRY'] = reg['name']
+                            os.environ['TRIVY_USERNAME'] = reg['user']
+                            os.environ['TRIVY_PASSWORD'] = reg['password']
             except:
-                continue
+                logger.info("No registry auth config is defined.")
+            ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
+            logger.debug("Active Registry: %s" % (ACTIVE_REGISTRY))
 
-        # Check vulnerabilities
-        # logger.info("Check vulnerabilities:") # Debug
-        if "scanning_error" in vul_list[image_name][0]:
-            logger.error("Trivy can't scann the image")
-            raise kopf.AdmissionError(
-                f"Trivy can't scan the image: %s" % (image_name))
-        else:
-            for sev in vul_annotations:
-                an_vul_num = vul_annotations[sev]
-                vul_num = vul_list[image_name][0][sev]
-                if int(vul_num) > int(an_vul_num):
-                    #                    logger.error("%s is bigger" % (sev)) # Debug
-                    raise kopf.AdmissionError(
-                        f"Too much vulnerability in the image: %s" % (image_name))
+            """Scan Images"""
+            TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
+            # --ignore-policy trivy.rego
+
+            res = subprocess.Popen(
+                TRIVY, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, error = res.communicate()
+            if error:
+                """Error Logging"""
+                logger.error("TRIVY ERROR: return %s" % (res.returncode))
+                if b"401" in error.strip():
+                    logger.error(
+                        "Repository: Unauthorized authentication required")
+                elif b"UNAUTHORIZED" in error.strip():
+                    logger.error(
+                        "Repository: Unauthorized authentication required")
+                elif b"You have reached your pull rate limit." in error.strip():
+                    logger.error("You have reached your pull rate limit.")
+                elif b"unsupported MediaType" in error.strip():
+                    logger.error(
+                        "Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
+                elif b"MANIFEST_UNKNOWN: manifest unknown; map[Tag:latest]" in error.strip():
+                    logger.error("No tag in registry")
                 else:
-                    #                    logger.info("%s is ok" % (sev)) # Debug
+                    logger.error("%s" % (error.strip()))
+                """Error action"""
+                se = {"scanning_error": 1}
+                vul_list[image_name] = [se, namespace]
+
+            elif output:
+                trivy_result = json.loads(output.decode("UTF-8"))
+                item_list = trivy_result['Results'][0]["Vulnerabilities"]
+                vuls = {"UNKNOWN": 0, "LOW": 0,
+                        "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
+                for item in item_list:
+                    vuls[item["Severity"]] += 1
+                vul_list[image_name] = [vuls, namespace]
+
+            """Generate log"""
+            logger.info("severity: %s" % (vul_list[image_name][0]))  # Logging
+
+            """Generate Metricfile"""
+            for image_name in vul_list.keys():
+                for severity in vul_list[image_name][0].keys():
+                    AC_VULN.labels(vul_list[image_name][1], image_name, severity).set(
+                        int(vul_list[image_name][0][severity]))
+            # logger.info("Prometheus Done") # Debug
+
+            # Get vulnerabilities from annotations
+            vul_annotations = {"UNKNOWN": 0, "LOW": 0,
+                            "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
+            for sev in vul_annotations:
+                try:
+                    #                logger.info("%s: %s" % (sev, annotations['trivy.security.devopstales.io/' + sev.lower()])) # Debug
+                    vul_annotations[sev] = annotations['trivy.security.devopstales.io/' + sev.lower()]
+                except:
                     continue
+
+            # Check vulnerabilities
+            # logger.info("Check vulnerabilities:") # Debug
+            if "scanning_error" in vul_list[image_name][0]:
+                logger.error("Trivy can't scann the image")
+                raise kopf.AdmissionError(
+                    f"Trivy can't scan the image: %s" % (image_name))
+            else:
+                for sev in vul_annotations:
+                    an_vul_num = vul_annotations[sev]
+                    vul_num = vul_list[image_name][0][sev]
+                    if int(vul_num) > int(an_vul_num):
+                        #                    logger.error("%s is bigger" % (sev)) # Debug
+                        raise kopf.AdmissionError(
+                            f"Too much vulnerability in the image: %s" % (image_name))
+                    else:
+                        #                    logger.info("%s is ok" % (sev)) # Debug
+                        continue
 
 #############################################################################
 # print to operator log
