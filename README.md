@@ -17,6 +17,10 @@ Default trivy-operator execute a scan script every 5 minutes. It will get images
 ### Trivy Image Validator
 The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy if it is in a namespace with the label `trivy-operator-validation=true`.
 
+## Install
+
+User the [helm Chert](https://github.com/devopstales/helm-charts)
+
 ## Usage
 
 ```bash
