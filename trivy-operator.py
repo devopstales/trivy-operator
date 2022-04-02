@@ -60,15 +60,15 @@ async def startup_fn_crd(logger, **kwargs):
         api_version="apiextensions.k8s.io/v1",
         kind="CustomResourceDefinition",
         metadata=k8s_client.V1ObjectMeta(
-            name="namespace-scanners.trivy-operator.devopstales.io"),
+            name="namespace-scanners.trivy-operator.devopstales.io",
+            labels={"app.kubernetes.io/managed-by":"trivy-operator"}
+        ),
         spec=k8s_client.V1CustomResourceDefinitionSpec(
             group="trivy-operator.devopstales.io",
             versions=[k8s_client.V1CustomResourceDefinitionVersion(
                 name="v1",
                 served=True,
                 storage=True,
-                subresources=k8s_client.V1CustomResourceSubresources(
-                    status={}),
                 schema=k8s_client.V1CustomResourceValidation(
                     open_apiv3_schema=k8s_client.V1JSONSchemaProps(
                         type="object",
@@ -97,19 +97,16 @@ async def startup_fn_crd(logger, **kwargs):
                 additional_printer_columns=[k8s_client.V1CustomResourceColumnDefinition(
                     name="NamespaceSelector",
                     type="string",
-                    priority=0,
                     json_path=".spec.namespace_selector",
                     description="Namespace Selector for pod scanning"
                 ), k8s_client.V1CustomResourceColumnDefinition(
                     name="Crontab",
                     type="string",
-                    priority=0,
                     json_path=".spec.crontab",
                     description="crontab value"
                 ), k8s_client.V1CustomResourceColumnDefinition(
                     name="Message",
                     type="string",
-                    priority=0,
                     json_path=".status.create_fn.message",
                     description="As returned from the handler (sometimes)."
                 )]
@@ -120,6 +117,243 @@ async def startup_fn_crd(logger, **kwargs):
                 plural="namespace-scanners",
                 singular="namespace-scanner",
                 short_names=["ns-scan"]
+            )
+        )
+    )
+
+    # vulnerabilityreport
+    vreport_crd = k8s_client.V1CustomResourceDefinition(
+        api_version="apiextensions.k8s.io/v1",
+        kind="CustomResourceDefinition",
+        metadata=k8s_client.V1ObjectMeta(
+            name="vulnerabilityreports.trivy-operator.devopstales.io",
+            labels={"app.kubernetes.io/managed-by":"trivy-operator"}
+        ),
+        spec=k8s_client.V1CustomResourceDefinitionSpec(
+            group="trivy-operator.devopstales.io",
+            versions=[k8s_client.V1CustomResourceDefinitionVersion(
+                name="v1",
+                served=True,
+                storage=True,
+                schema=k8s_client.V1CustomResourceValidation(
+                    open_apiv3_schema=k8s_client.V1JSONSchemaProps(
+                        description="VulnerabilityReport summarizes vulnerabilities in application dependencies and operating system packages built into container images.",
+                        type="object",
+                        required=[
+                            "apiVersion",
+                            "kind",
+                            "metadata",
+                            "report"
+                        ],
+                        properties={
+                            "apiVersion": k8s_client.V1JSONSchemaProps(
+                                type="string"
+                            ),
+                            "kind": k8s_client.V1JSONSchemaProps(
+                                type="string"
+                            ),
+                            "metadata": k8s_client.V1JSONSchemaProps(
+                                type="object"
+                            ),
+                            "report": k8s_client.V1JSONSchemaProps(
+                                description="Report is the actual vulnerability report data.",
+                                type="object",
+                                required=[
+                                    "updateTimestamp",
+                                    "artifact",
+                                    "summary",
+                                    "vulnerabilities"
+                                ],
+                                properties={
+                                    "updateTimestamp": k8s_client.V1JSONSchemaProps(
+                                        description="UpdateTimestamp is a timestamp representing the server time in UTC when this report was updated.",
+                                        type="string",
+                                        format="date-time"
+                                    ),
+                                    "registry": k8s_client.V1JSONSchemaProps(
+                                        description="Registry is the registry the Artifact was pulled from.",
+                                        type="object",
+                                        properties={
+                                            "server": k8s_client.V1JSONSchemaProps(
+                                                description="Server the FQDN of registry server.",
+                                                type="string"
+                                            )
+                                        }
+                                    ),
+                                    "artifact": k8s_client.V1JSONSchemaProps(
+                                        description="Artifact represents a standalone, executable package of software that includes everything needed to run an application.",
+                                        type="object",
+                                        properties={
+                                            "repository": k8s_client.V1JSONSchemaProps(
+                                                description="Repository is the name of the repository in the Artifact registry.",
+                                                type="string"
+                                            ),
+                                            "tag": k8s_client.V1JSONSchemaProps(
+                                                description="Tag is a mutable, human-readable string used to identify an Artifact.",
+                                                type="string"
+                                            )
+                                        }
+                                    ),
+                                    "summary": k8s_client.V1JSONSchemaProps(
+                                        description="Summary is a summary of Vulnerability counts grouped by Severity.",
+                                        type="object",
+                                        required=[
+                                            "criticalCount",
+                                            "highCount",
+                                            "mediumCount",
+                                            "lowCount",
+                                            "unknownCount"
+                                        ],
+                                        properties={
+                                            "criticalCount": k8s_client.V1JSONSchemaProps(
+                                                description="CriticalCount is the number of vulnerabilities with Critical Severity.",
+                                                type="integer",
+                                                minimum=0
+                                            ),
+                                            "highCount": k8s_client.V1JSONSchemaProps(
+                                                description="HighCount is the number of vulnerabilities with High Severity.",
+                                                type="integer",
+                                                minimum=0
+                                            ),
+                                            "mediumCount": k8s_client.V1JSONSchemaProps(
+                                                description="MediumCount is the number of vulnerabilities with Medium Severity.",
+                                                type="integer",
+                                                minimum=0
+                                            ),
+                                            "lowCount": k8s_client.V1JSONSchemaProps(
+                                                description="LowCount is the number of vulnerabilities with Low Severity.",
+                                                type="integer",
+                                                minimum=0
+                                            ),
+                                            "unknownCount": k8s_client.V1JSONSchemaProps(
+                                                description="UnknownCount is the number of vulnerabilities with unknown severity.",
+                                                type="integer",
+                                                minimum=0
+                                            )
+                                        }
+                                    ),
+                                    "vulnerabilities": k8s_client.V1JSONSchemaProps(
+                                        description="Vulnerabilities is a list of operating system (OS) or application software Vulnerability items found in the Artifact.",
+                                        type="array",
+                                        items=k8s_client.V1JSONSchemaProps(
+                                            type="object",
+                                            required=[
+                                                "vulnerabilityID",
+                                                "resource",
+                                                "installedVersion",
+                                                "fixedVersion",
+                                                "severity",
+                                                "title"
+                                            ],
+                                            properties={
+                                                "vulnerabilityID": k8s_client.V1JSONSchemaProps(
+                                                    description="VulnerabilityID the vulnerability identifier.",
+                                                    type="string"
+                                                ),
+                                                "resource": k8s_client.V1JSONSchemaProps(
+                                                    description="Resource is a vulnerable package, application, or library.",
+                                                    type="string"
+                                                ),
+                                                "installedVersion": k8s_client.V1JSONSchemaProps(
+                                                    description="InstalledVersion indicates the installed version of the Resource.",
+                                                    type="string"
+                                                ),
+                                                "fixedVersion": k8s_client.V1JSONSchemaProps(
+                                                    description="FixedVersion indicates the version of the Resource in which this vulnerability has been fixed.",
+                                                    type="string"
+                                                ),
+                                                "score": k8s_client.V1JSONSchemaProps(
+                                                    type="number"
+                                                ),
+                                                "severity": k8s_client.V1JSONSchemaProps(
+                                                    type="string",
+                                                    enum=[
+                                                        "CRITICAL",
+                                                        "HIGH",
+                                                        "MEDIUM",
+                                                        "LOW",
+                                                        "UNKNOWN",
+                                                        "NONE"
+                                                    ]
+                                                ),
+                                                "title": k8s_client.V1JSONSchemaProps(
+                                                    type="string"
+                                                ),
+                                                "description": k8s_client.V1JSONSchemaProps(
+                                                    type="string"
+                                                ),
+                                                "primaryLink": k8s_client.V1JSONSchemaProps(
+                                                    type="string"
+                                                ),
+                                                "links": k8s_client.V1JSONSchemaProps(
+                                                    type="array",
+                                                    items=k8s_client.V1JSONSchemaProps(
+                                                        type="string"
+                                                    )
+                                                )
+                                            }
+                                        )
+                                    )
+                                },
+                            )
+                        }
+                    )
+                ),
+                additional_printer_columns=[k8s_client.V1CustomResourceColumnDefinition(
+                    name="Repository",
+                    type="string",
+                    json_path=".report.artifact.repository",
+                    description="The name of image repository"
+                ), k8s_client.V1CustomResourceColumnDefinition(
+                    name="Tag",
+                    type="string",
+                    json_path=".report.artifact.tag",
+                    description="The name of image tag"
+                ), k8s_client.V1CustomResourceColumnDefinition(
+                    name="Age",
+                    type="date",
+                    json_path=".metadata.creationTimestamp",
+                    description="The age of the report"
+                ), k8s_client.V1CustomResourceColumnDefinition(
+                    name="Critical",
+                    type="integer",
+                    priority=1,
+                    json_path=".report.summary.criticalCount",
+                    description="The number of critical vulnerabilities"
+                ), k8s_client.V1CustomResourceColumnDefinition(
+                    name="High",
+                    type="integer",
+                    priority=1,
+                    json_path=".report.summary.highCount",
+                    description="The number of high vulnerabilities"
+                ), k8s_client.V1CustomResourceColumnDefinition(
+                    name="Medium",
+                    type="integer",
+                    priority=1,
+                    json_path=".report.summary.mediumCount",
+                    description="The number of medium vulnerabilities"
+                ), k8s_client.V1CustomResourceColumnDefinition(
+                    name="Low",
+                    type="integer",
+                    priority=1,
+                    json_path=".report.summary.lowCount",
+                    description="The number of low vulnerabilities"
+                ), k8s_client.V1CustomResourceColumnDefinition(
+                    name="Unknown",
+                    type="integer",
+                    priority=1,
+                    json_path=".report.summary.unknownCount",
+                    description="The number of unknown vulnerabilities"
+                )]
+            )],
+            scope="Namespaced",
+            names=k8s_client.V1CustomResourceDefinitionNames(
+                kind="VulnerabilityReport",
+                plural="vulnerabilityreports",
+                singular="vulnerabilityreport",
+                list_kind="VulnerabilityReportList",
+                categories=["all"],
+                short_names=["vuln","vulns"]
             )
         )
     )
@@ -135,7 +369,14 @@ async def startup_fn_crd(logger, **kwargs):
             api_instance.create_custom_resource_definition(scanner_crd)
         except ApiException as e:
             if e.status == 409:  # if the CRD already exists the K8s API will respond with a 409 Conflict
-                logger.info("CRD already exists!!!")
+                logger.info("NamespaceScanner CRD already exists!!!")
+            else:
+                raise e
+        try:
+            api_instance.create_custom_resource_definition(vreport_crd)
+        except ApiException as e:
+            if e.status == 409:  # if the CRD already exists the K8s API will respond with a 409 Conflict
+                logger.info("VulnerabilityReport CRD already exists!!!")
             else:
                 raise e
 
