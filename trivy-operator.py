@@ -15,6 +15,7 @@ import base64
 from typing import AsyncIterator, Optional, Tuple, Collection
 from datetime import datetime
 from OpenSSL import crypto
+from datetime import datetime, timezone
 
 #############################################################################
 # ToDo
@@ -273,7 +274,8 @@ async def startup_fn_crd(logger, **kwargs):
                                                         "MEDIUM",
                                                         "LOW",
                                                         "UNKNOWN",
-                                                        "NONE"
+                                                        "NONE",
+                                                        "ERROR"
                                                     ]
                                                 ),
                                                 "title": k8s_client.V1JSONSchemaProps(
@@ -403,15 +405,14 @@ async def startup_fn_prometheus_client(logger, **kwargs):
 
 """Scanner Creation"""
 
-
 @kopf.on.create('trivy-operator.devopstales.io', 'v1', 'namespace-scanners')
 async def create_fn( logger, spec, **kwargs):
     logger.info("NamespaceScanner Created")
 
     try:
         crontab = spec['crontab']
-        logger.debug("namespace-scanners - crontab:")
-        logger.debug(format(crontab))
+        logger.debug("namespace-scanners - crontab:") # debuglog
+        logger.debug(format(crontab)) # debuglog
     except:
         logger.error("crontab must be set !!!")
         raise kopf.PermanentError("crontab must be set")
@@ -419,8 +420,8 @@ async def create_fn( logger, spec, **kwargs):
     clusterWide = None
     try:
         clusterWide = bool(spec['clusterWide'])
-        logger.debug("namespace-scanners - clusterWide:")
-        logger.debug(format(clusterWide))
+        logger.debug("namespace-scanners - clusterWide:") # debuglog
+        logger.debug(format(clusterWide)) # debuglog
     except:
         logger.info("clusterWide is not set, checking namespaceSelector option")
         clusterWide = False
@@ -428,8 +429,8 @@ async def create_fn( logger, spec, **kwargs):
     namespaceSelector = None
     try:
         namespaceSelector = spec['namespace_selector']
-        logger.debug("namespace-scanners - namespace_selector:")
-        logger.debug(format(namespaceSelector))
+        logger.debug("namespace-scanners - namespace_selector:") # debuglog
+        logger.debug(format(namespaceSelector)) # debuglog
     except:
         logger.info("namespace_selector is not set")
 
@@ -444,6 +445,7 @@ async def create_fn( logger, spec, **kwargs):
             pod_list = {}
             trivy_result_list = {}
             vul_list = {}
+            vul_report = {}
             tagged_ns_list = []
 
             if IN_CLUSTER:
@@ -452,9 +454,9 @@ async def create_fn( logger, spec, **kwargs):
                 k8s_config.load_kube_config()
 
             namespace_list = k8s_client.CoreV1Api().list_namespace()
-            logger.debug("namespace list begin:")
-            logger.debug(format(namespace_list))
-            logger.debug("namespace list end:")
+            logger.debug("namespace list begin:") # debuglog
+            logger.debug(format(namespace_list)) # debuglog
+            logger.debug("namespace list end:") # debuglog
 
             for ns in namespace_list.items:
                 try:
@@ -464,10 +466,10 @@ async def create_fn( logger, spec, **kwargs):
                     logger.error(str(e))
 
                 """Find Namespaces with selector tag"""
-                logger.debug("labels and namespace begin")
-                logger.debug(format(ns_label_list))
-                logger.debug(format(ns_name))
-                logger.debug("labels and namespace end")
+                logger.debug("labels and namespace begin") # debuglog
+                logger.debug(format(ns_label_list)) # debuglog
+                logger.debug(format(ns_name)) # debuglog
+                logger.debug("labels and namespace end") # debuglog
                 for label_key, label_value in ns_label_list:
                     if clusterWide or (namespaceSelector == label_key and bool(label_value) == True):
                         tagged_ns_list.append(ns_name)
@@ -494,10 +496,10 @@ async def create_fn( logger, spec, **kwargs):
                             pod_list[pod_name].append(tagged_ns)
 
                             unique_image_list[image_name] = image_name
-                            logger.debug("containers begin:")
-                            logger.debug(format(pod_name))
-                            logger.debug(format(pod_list[pod_name]))
-                            logger.debug("containers end:")
+                            logger.debug("containers begin:") # debuglog
+                            logger.debug(format(pod_name)) # debuglog
+                            logger.debug(format(pod_list[pod_name])) # debuglog
+                            logger.debug("containers end:") # debuglog
                     except:
                         logger.info('containers Type is None')
                         continue
@@ -517,10 +519,10 @@ async def create_fn( logger, spec, **kwargs):
                             pod_list[pod_name].append(tagged_ns)
 
                             unique_image_list[image_name] = image_name
-                            logger.debug("InitContainers begin:")
-                            logger.debug(format(pod_name))
-                            logger.debug(format(pod_list[pod_name]))
-                            logger.debug("InitContainers end:")
+                            logger.debug("InitContainers begin:") # debuglog
+                            logger.debug(format(pod_name)) # debuglog
+                            logger.debug(format(pod_list[pod_name])) # debuglog
+                            logger.debug("InitContainers end:") # debuglog
                     except:
                         continue
 
@@ -545,10 +547,9 @@ async def create_fn( logger, spec, **kwargs):
                                 os.environ['TRIVY_USERNAME'] = reg['user']
                                 os.environ['TRIVY_PASSWORD'] = reg['password']
                 except:
-                    logger.debug("No registry auth config is defined.")
+                    logger.debug("No registry auth config is defined.") # debuglog
                     ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
-                    logger.info("Active Registry: %s" %
-                                (ACTIVE_REGISTRY))  # Debug
+                    logger.info("Active Registry: %s" % (ACTIVE_REGISTRY))
 
                 TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
                 # --ignore-policy trivy.rego
@@ -576,7 +577,7 @@ async def create_fn( logger, spec, **kwargs):
                     else:
                         logger.error("%s" % (error.strip()))
                     """Error action"""
-                    trivy_result_list[image_name] = "scanning_error"
+                    trivy_result_list[image_name] = "ERROR"
                 elif output:
                     trivy_result = json.loads(output.decode("UTF-8"))
                     trivy_result_list[image_name] = trivy_result
@@ -584,16 +585,29 @@ async def create_fn( logger, spec, **kwargs):
 
 
             for pod_name in pod_list:
-                logger.debug("Assigning scanning result for Pod: %s" % (pod_name))
                 image_name = pod_list[pod_name][0]
                 image_id = pod_list[pod_name][1]
                 ns_name = pod_list[pod_name][2]
+                logger.debug("Assigning scanning result for Pod: %s - %s" % (pod_name, image_name)) # debuglog
 
                 trivy_result = trivy_result_list[image_name]
-                #logger.debug(trivy_result)
-                if trivy_result == "scanning_error":
-                    vuls = {"scanning_error": 1}
-                    vul_list[pod_name] = [vuls, ns_name]
+                #logger.debug(trivy_result) # debug
+                vul_report[pod_name] = []
+                if trivy_result == "ERROR":
+                    vuls = {"ERROR": 1}
+                    vuls_long = {
+                        "fixedVersion": "",
+                        "installedVersion": "",
+                        "links": [],
+                        "primaryLink": "",
+                        "resource": "",
+                        "score": 0,
+                        "severity": "ERROR",
+                        "title": "Image Scanning Error",
+                        "vulnerabilityID": ""
+                    }
+                    vul_report[pod_name].append(vuls_long)
+                    vul_list[pod_name] = [vuls, ns_name, image_name]
                 else:
                     if 'Results' in trivy_result and 'Vulnerabilities' in trivy_result['Results'][0]:
                         vuls = {"UNKNOWN": 0, "LOW": 0,
@@ -611,14 +625,112 @@ async def create_fn( logger, spec, **kwargs):
                                 item["VulnerabilityID"]
                             ).set(1)
                             vuls[item["Severity"]] += 1
-                        vul_list[pod_name] = [vuls, ns_name]
+
+                            try:
+                                score = item["CVSS"]["nvd"]["V3Score"]
+                            except:
+                                try:
+                                    score = tem["CVSS"]["redhat"]["V3Score"]
+                                except:
+                                    score = 0
+
+                            vuls_long = {
+                                "vulnerabilityID": item["VulnerabilityID"],
+                                "resource": item["PkgName"],
+                                "installedVersion": item["InstalledVersion"],
+                                "primaryLink": item["PrimaryURL"],
+                                "severity": item["Severity"],
+                                "score": score,
+                                "links": item["References"],
+                                "title": item["Title"],
+                                "fixedVersion": "",
+                            }
+                            vul_report[pod_name].append(vuls_long)
+                        vul_list[pod_name] = [vuls, ns_name, image_name]
+
+            """Generate VulnerabilityReport"""
+            def create_vulnerabilityreports(body, namespace):
+                with k8s_client.ApiClient() as api_client:
+                    api_instance = k8s_client.CustomObjectsApi(api_client)
+                    group = 'trivy-operator.devopstales.io'
+                    version = 'v1'
+                    plural = 'vulnerabilityreports'
+                    pretty = 'true'
+                    field_manager = 'trivy-operator'
+                    body = body
+                    namespace = namespace
+                try:
+                    api_response = api_instance.create_namespaced_custom_object(
+                        group, version, namespace, plural, body, pretty=pretty, field_manager=field_manager)
+                except ApiException as e:
+                    if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
+                        logger.info("VulnerabilityReport CRD already exists!!!")
+                    else:
+                        print("Exception when createing vulnerabilityreports: %s\n" % e)
+
+            date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%sZ")
+
+            for pod_name in vul_list.keys():
+                vuls = vul_list[pod_name][0]
+                namespace = vul_list[pod_name][1]
+                image = vul_list[pod_name][2]
+
+                image_registry = image.split('/')[0]
+                image_part_name = image.split('/', 1)[1]
+                image_name = image_part_name.split(':')[0]
+                image_tag = image.split(':')[1]
+
+                criticalCount = vuls['CRITICAL']
+                highCount = vuls['HIGH']
+                mediumCount = vuls['MEDIUM']
+                lowCount = vuls['LOW']
+                unknownCount = vuls['UNKNOWN']
+
+                vr_name = "pod"
+                vr_name += '-'
+                vr_name += pod_name.split('_')[0]
+                vr_name += '-'
+                vr_name += "container"
+                vr_name += '-'
+                vr_name += pod_name.split('_')[1]
+                # pod-[nginx]-container-[init]
+
+                vulnerabilityReport = {
+                    "apiVersion": "trivy-operator.devopstales.io/v1",
+                    "kind": "VulnerabilityReport",
+                    "metadata": {
+                        "name": vr_name
+                    },
+                    "report": {
+                        "artifact": {
+                            "repository": image_name,
+                            "tag": image_tag
+                        },
+                        "registry": {
+                            "server": image_registry
+                        },
+                        "summary": {
+                            "criticalCount": criticalCount,
+                            "highCount": highCount,
+                            "lowCount": lowCount,
+                            "mediumCount": mediumCount,
+                            "unknownCount": unknownCount
+                        },
+                        "updateTimestamp": date,
+                        "vulnerabilities": []
+                    }
+                }
+                vulnerabilityReport["report"]["vulnerabilities"] = vul_report[pod_name]
+                # logger.debug(vulnerabilityReport) # debug
+                create_vulnerabilityreports(vulnerabilityReport, namespace)
+
 
             """Generate Metricfile"""
             for pod_name in vul_list.keys():
                 for severity in vul_list[pod_name][0].keys():
                     CONTAINER_VULN_SUM.labels(
                         vul_list[pod_name][1],
-                        image_name, severity).set(int(vul_list[pod_name][0][severity])
+                        vul_list[pod_name][2], severity).set(int(vul_list[pod_name][0][severity])
                                                   )
             await asyncio.sleep(15)
         else:
@@ -782,8 +894,7 @@ if IS_AC_ENABLED:
                     certExpires = datetime.strptime(
                         str(cert.get_notAfter(), "ascii"), "%Y%m%d%H%M%SZ")
                     daysToExpiration = (certExpires - datetime.now()).days
-                    logger.info("Day to certifiacet expiration: %s" %
-                                daysToExpiration)  # debug
+                    logger.info("Day to certifiacet expiration: %s" % daysToExpiration)  # infolog
                     if daysToExpiration <= 7:  # debug 365
                         logger.warning("Certificate Expires soon. Regenerating.")
                         # delete cert file
@@ -888,7 +999,7 @@ if IS_AC_ENABLED:
             except:
                 logger.info("No registry auth config is defined.")
             ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
-            logger.debug("Active Registry: %s" % (ACTIVE_REGISTRY))
+            logger.debug("Active Registry: %s" % (ACTIVE_REGISTRY)) # debuglog
 
             """Scan Images"""
             TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
@@ -916,7 +1027,7 @@ if IS_AC_ENABLED:
                 else:
                     logger.error("%s" % (error.strip()))
                 """Error action"""
-                se = {"scanning_error": 1}
+                se = {"ERROR": 1}
                 vul_list[image_name] = [se, namespace]
 
             elif output:
@@ -950,7 +1061,7 @@ if IS_AC_ENABLED:
 
             # Check vulnerabilities
             # logger.info("Check vulnerabilities:") # Debug
-            if "scanning_error" in vul_list[image_name][0]:
+            if "ERROR" in vul_list[image_name][0]:
                 logger.error("Trivy can't scann the image")
                 raise kopf.AdmissionError(
                     f"Trivy can't scan the image: %s" % (image_name))
