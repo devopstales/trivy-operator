@@ -497,7 +497,6 @@ async def create_fn( logger, spec, **kwargs):
                 """Find images in pods"""
                 for pod in namespaced_pod_list.items:
                     containers = pod.status.container_statuses
-
                     try:
                         for image in containers:
                             pod_name = pod.metadata.name
@@ -506,9 +505,11 @@ async def create_fn( logger, spec, **kwargs):
                             pod_list[pod_name] = list()
                             image_name = image.image
                             image_id = image.image_id
+                            pod_uid = pod.metadata.uid
                             pod_list[pod_name].append(image_name)
                             pod_list[pod_name].append(image_id)
                             pod_list[pod_name].append(tagged_ns)
+                            pod_list[pod_name].append(pod_uid)
 
                             unique_image_list[image_name] = image_name
                             logger.debug("containers begin:") # debuglog
@@ -529,9 +530,11 @@ async def create_fn( logger, spec, **kwargs):
                             pod_list[pod_name] = list()
                             image_name = image.image
                             image_id = image.image_id
+                            pod_uid = pod.metadata.uid
                             pod_list[pod_name].append(image_name)
                             pod_list[pod_name].append(image_id)
                             pod_list[pod_name].append(tagged_ns)
+                            pod_list[pod_name].append(pod_uid)
 
                             unique_image_list[image_name] = image_name
                             logger.debug("InitContainers begin:") # debuglog
@@ -606,6 +609,7 @@ async def create_fn( logger, spec, **kwargs):
                 image_name = pod_list[pod_name][0]
                 image_id = pod_list[pod_name][1]
                 ns_name = pod_list[pod_name][2]
+                pod_uid = pod_list[pod_name][3]
                 logger.debug("Assigning scanning result for Pod: %s - %s" % (pod_name, image_name)) # debuglog
 
                 trivy_result = trivy_result_list[image_name]
@@ -625,7 +629,12 @@ async def create_fn( logger, spec, **kwargs):
                         "vulnerabilityID": ""
                     }
                     vul_report[pod_name] = [vuls_long]
-                    vul_list[pod_name] = [vuls, ns_name, image_name]
+                    vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
+                    logger.debug("result begin:") # debuglog
+                    logger.debug(pod_name) # debuglog
+                    logger.debug(vul_report[pod_name]) # debuglog
+                    logger.debug(vul_list[pod_name]) # debuglog
+                    logger.debug("result end:") # debuglog
                 else:
                     if 'Results' in trivy_result and 'Vulnerabilities' in trivy_result['Results'][0]:
                         vuls = {"UNKNOWN": 0, "LOW": 0,
@@ -663,7 +672,12 @@ async def create_fn( logger, spec, **kwargs):
                                 "title": item["Title"],
                             }
                             vul_report[pod_name] = [vuls_long]
-                        vul_list[pod_name] = [vuls, ns_name, image_name]
+                        vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
+                        logger.debug("result begin:") # debuglog
+                        logger.debug(pod_name) # debuglog
+                        logger.debug(vul_report[pod_name]) # debuglog
+                        logger.debug(vul_list[pod_name]) # debuglog
+                        logger.debug("result end:") # debuglog
                     elif 'Results' in trivy_result and 'Vulnerabilities' not in trivy_result['Results'][0]:
                         # For Alpine Linux
                         vuls = {"UNKNOWN": 0, "LOW": 0,
@@ -680,7 +694,12 @@ async def create_fn( logger, spec, **kwargs):
                             "vulnerabilityID": ""
                         }
                         vul_report[pod_name] = [vuls_long]
-                        vul_list[pod_name] = [vuls, ns_name, image_name]
+                        vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
+                        logger.debug("result begin:") # debuglog
+                        logger.debug(pod_name) # debuglog
+                        logger.debug(vul_report[pod_name]) # debuglog
+                        logger.debug(vul_list[pod_name]) # debuglog
+                        logger.debug("result end:") # debuglog
 
             """Generate VulnerabilityReport"""
             def create_vulnerabilityreports(body, namespace):
@@ -705,10 +724,10 @@ async def create_fn( logger, spec, **kwargs):
             date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%sZ")
 
             for pod_name in vul_list.keys():
-                logger.debug(pod_name) # debug
                 vuls = vul_list[pod_name][0]
                 namespace = vul_list[pod_name][1]
                 image = vul_list[pod_name][2]
+                pod_uid = vul_list[pod_name][3]
 
                 image_registry = image.split('/')[0]
                 image_part_name = image.split('/', 1)[1]
@@ -736,11 +755,31 @@ async def create_fn( logger, spec, **kwargs):
                 vr_name += pod_name.split('_')[1]
                 # pod-[nginx]-container-[init]
 
+                logger.debug("Generate VR begin:") # debug
+                logger.debug(pod_name) # debug
+                logger.debug(vul_list[pod_name]) # debug
+                logger.debug("Generate VR end:") # debug
+
                 vulnerabilityReport = {
                     "apiVersion": "trivy-operator.devopstales.io/v1",
                     "kind": "VulnerabilityReport",
                     "metadata": {
-                        "name": vr_name
+                        "name": vr_name,
+                        "labels": {
+                            "trivy-operator.pod.namespace": namespace,
+                            "trivy-operator.pod.name": pod_name.split('_')[0],
+                            "trivy-operator.container.name": pod_name.split('_')[1]
+                        },
+                        "ownerReferences": [
+                            {
+                                "apiVersion": "v1",
+                                "kind": "Pod",
+                                "name": pod_name.split('_')[0],
+                                "uid": pod_uid,
+                                "blockOwnerDeletion": False,
+                                "controller": True,
+                            }
+                       ]
                     },
                     "report": {
                         "artifact": {
@@ -763,7 +802,7 @@ async def create_fn( logger, spec, **kwargs):
                     }
                 }
                 vulnerabilityReport["report"]["vulnerabilities"] = vul_report[pod_name]
-                # logger.debug(vulnerabilityReport) # debug
+#                logger.info(vulnerabilityReport) # debug
                 create_vulnerabilityreports(vulnerabilityReport, namespace)
 
 
