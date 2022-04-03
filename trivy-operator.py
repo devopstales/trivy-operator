@@ -22,9 +22,7 @@ from datetime import datetime, timezone
 #############################################################################
 # OP
 # cache scanned images ???
-## rem fixedVersion from CRD
 ## update vulnerabilityreport if existing 
-## 610 - 694 az alpine init container nincs jelentés
 # AC
 # cache scanned images ???
 #############################################################################
@@ -48,8 +46,9 @@ AC_VULN = prometheus_client.Gauge(
 )
 IN_CLUSTER = os.getenv("IN_CLUSTER", False)
 IS_GLOBAL = os.getenv("IS_GLOBAL", False)
-IS_AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False)
-
+AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False)
+REDIS_ENABLED = os.getenv("REDIS_ENABLED", False)
+REDIS_BACKED = os.getenv("REDIS_BACKED")
 #############################################################################
 # Pretasks
 #############################################################################
@@ -254,7 +253,6 @@ async def startup_fn_crd(logger, **kwargs):
                                                 "vulnerabilityID",
                                                 "resource",
                                                 "installedVersion",
-                                                "fixedVersion",
                                                 "severity",
                                                 "title"
                                             ],
@@ -269,10 +267,6 @@ async def startup_fn_crd(logger, **kwargs):
                                                 ),
                                                 "installedVersion": k8s_client.V1JSONSchemaProps(
                                                     description="InstalledVersion indicates the installed version of the Resource.",
-                                                    type="string"
-                                                ),
-                                                "fixedVersion": k8s_client.V1JSONSchemaProps(
-                                                    description="FixedVersion indicates the version of the Resource in which this vulnerability has been fixed.",
                                                     type="string"
                                                 ),
                                                 "score": k8s_client.V1JSONSchemaProps(
@@ -404,7 +398,10 @@ async def startup_fn_crd(logger, **kwargs):
 
 @kopf.on.startup()
 async def startup_fn_trivy_cache(logger, **kwargs):
-    TRIVY_CACHE = ["trivy", "-q", "fs", "-f", "json", "/opt"]
+    if REDIS_ENABLED:
+        TRIVY_CACHE = ["trivy", "-q", "image", "--cache-backend", REDIS_BACKED, "--download-db-only"]
+    else:
+        TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
     trivy_cache_result = (
         subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
     )
@@ -569,7 +566,10 @@ async def create_fn( logger, spec, **kwargs):
                     ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
                     logger.info("Active Registry: %s" % (ACTIVE_REGISTRY))
 
-                TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
+                if REDIS_ENABLED:
+                    TRIVY = ["trivy", "-q", "image", "-f", "json", "--cache-backend", REDIS_BACKED, image_name]
+                else:
+                    TRIVY = ["trivy", "-q", "image", "-f", "json", image_name]
                 # --ignore-policy trivy.rego
 
                 res = subprocess.Popen(
@@ -615,7 +615,6 @@ async def create_fn( logger, spec, **kwargs):
                                 "MEDIUM": 0, "HIGH": 0,
                                 "CRITICAL": 0, "ERROR": 1}
                     vuls_long = {
-                        "fixedVersion": "",
                         "installedVersion": "",
                         "links": [],
                         "primaryLink": "",
@@ -662,7 +661,6 @@ async def create_fn( logger, spec, **kwargs):
                                 "score": score,
                                 "links": item["References"],
                                 "title": item["Title"],
-                                "fixedVersion": "",
                             }
                             vul_report[pod_name] = [vuls_long]
                         vul_list[pod_name] = [vuls, ns_name, image_name]
@@ -672,7 +670,6 @@ async def create_fn( logger, spec, **kwargs):
                                 "MEDIUM": 0, "HIGH": 0,
                                 "CRITICAL": 0, "ERROR": 0}
                         vuls_long = {
-                            "fixedVersion": "",
                             "installedVersion": "",
                             "links": [],
                             "primaryLink": "",
@@ -785,7 +782,7 @@ async def create_fn( logger, spec, **kwargs):
 # Admission Controller
 #############################################################################
 
-if IS_AC_ENABLED:
+if AC_ENABLED:
     if IN_CLUSTER:
         class ServiceTunnel:
             async def __call__(
@@ -905,7 +902,7 @@ if IS_AC_ENABLED:
 
 """Admission Server Creation"""
 
-if IS_AC_ENABLED:
+if AC_ENABLED:
     @kopf.on.startup()
     def configure(settings: kopf.OperatorSettings, logger, **_):
         # Auto-detect the best server (K3d/Minikube/simple):
@@ -976,7 +973,7 @@ if IS_AC_ENABLED:
 
 """Admission Controller"""
 
-if IS_AC_ENABLED:
+if AC_ENABLED:
     @kopf.on.validate('pod', operation='CREATE')
     def validate1(logger, namespace, name, annotations, spec, **_):
         logger.info("Admission Controller is working")
@@ -1047,7 +1044,10 @@ if IS_AC_ENABLED:
             logger.debug("Active Registry: %s" % (ACTIVE_REGISTRY)) # debuglog
 
             """Scan Images"""
-            TRIVY = ["trivy", "-q", "i", "-f", "json", image_name]
+            if REDIS_ENABLED:
+                TRIVY = ["trivy", "-q", "image", "-f", "json", "--cache-backend", REDIS_BACKED, image_name]
+            else:
+                TRIVY = ["trivy", "-q", "image", "-f", "json", image_name]
             # --ignore-policy trivy.rego
 
             res = subprocess.Popen(
