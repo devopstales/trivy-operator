@@ -22,6 +22,9 @@ from datetime import datetime, timezone
 #############################################################################
 # OP
 # cache scanned images ???
+## rem fixedVersion from CRD
+## update vulnerabilityreport if existing 
+## 610 - 694 az alpine init container nincs jelentés
 # AC
 # cache scanned images ???
 #############################################################################
@@ -203,7 +206,8 @@ async def startup_fn_crd(logger, **kwargs):
                                             "highCount",
                                             "mediumCount",
                                             "lowCount",
-                                            "unknownCount"
+                                            "unknownCount",
+                                            "status"
                                         ],
                                         properties={
                                             "criticalCount": k8s_client.V1JSONSchemaProps(
@@ -230,6 +234,14 @@ async def startup_fn_crd(logger, **kwargs):
                                                 description="UnknownCount is the number of vulnerabilities with unknown severity.",
                                                 type="integer",
                                                 minimum=0
+                                            ),
+                                            "status": k8s_client.V1JSONSchemaProps(
+                                                description="The status of the image scann",
+                                                type="string",
+                                                enum=[
+                                                    "OK",
+                                                    "ERROR"
+                                                ]
                                             )
                                         }
                                     ),
@@ -346,6 +358,12 @@ async def startup_fn_crd(logger, **kwargs):
                     priority=1,
                     json_path=".report.summary.unknownCount",
                     description="The number of unknown vulnerabilities"
+                ), k8s_client.V1CustomResourceColumnDefinition(
+                    name="STATUS",
+                    type="string",
+                    priority=0,
+                    json_path=".report.summary.status",
+                    description="The status of the image scann"
                 )]
             )],
             scope="Namespaced",
@@ -592,9 +610,10 @@ async def create_fn( logger, spec, **kwargs):
 
                 trivy_result = trivy_result_list[image_name]
                 #logger.debug(trivy_result) # debug
-                vul_report[pod_name] = []
                 if trivy_result == "ERROR":
-                    vuls = {"ERROR": 1}
+                    vuls = {"UNKNOWN": 0, "LOW": 0,
+                                "MEDIUM": 0, "HIGH": 0,
+                                "CRITICAL": 0, "ERROR": 1}
                     vuls_long = {
                         "fixedVersion": "",
                         "installedVersion": "",
@@ -606,15 +625,15 @@ async def create_fn( logger, spec, **kwargs):
                         "title": "Image Scanning Error",
                         "vulnerabilityID": ""
                     }
-                    vul_report[pod_name].append(vuls_long)
+                    vul_report[pod_name] = [vuls_long]
                     vul_list[pod_name] = [vuls, ns_name, image_name]
                 else:
                     if 'Results' in trivy_result and 'Vulnerabilities' in trivy_result['Results'][0]:
                         vuls = {"UNKNOWN": 0, "LOW": 0,
-                                "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
+                                "MEDIUM": 0, "HIGH": 0,
+                                "CRITICAL": 0, "ERROR": 0}
                         item_list = trivy_result['Results'][0]["Vulnerabilities"]
                         for item in item_list:
-                            #print(item["PkgName"], file=sys.stderr)
                             CONTAINER_VULN.labels(
                                 ns_name,
                                 pod_name,
@@ -645,7 +664,25 @@ async def create_fn( logger, spec, **kwargs):
                                 "title": item["Title"],
                                 "fixedVersion": "",
                             }
-                            vul_report[pod_name].append(vuls_long)
+                            vul_report[pod_name] = [vuls_long]
+                        vul_list[pod_name] = [vuls, ns_name, image_name]
+                    elif 'Results' in trivy_result and 'Vulnerabilities' not in trivy_result['Results'][0]:
+                        # For Alpine Linux
+                        vuls = {"UNKNOWN": 0, "LOW": 0,
+                                "MEDIUM": 0, "HIGH": 0,
+                                "CRITICAL": 0, "ERROR": 0}
+                        vuls_long = {
+                            "fixedVersion": "",
+                            "installedVersion": "",
+                            "links": [],
+                            "primaryLink": "",
+                            "resource": "",
+                            "score": 0,
+                            "severity": "NONE",
+                            "title": "There ins no vulnerability in this image",
+                            "vulnerabilityID": ""
+                        }
+                        vul_report[pod_name] = [vuls_long]
                         vul_list[pod_name] = [vuls, ns_name, image_name]
 
             """Generate VulnerabilityReport"""
@@ -664,13 +701,14 @@ async def create_fn( logger, spec, **kwargs):
                         group, version, namespace, plural, body, pretty=pretty, field_manager=field_manager)
                 except ApiException as e:
                     if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
-                        logger.info("VulnerabilityReport CRD already exists!!!")
+                        logger.info("VulnerabilityReport already exists!!!")
                     else:
                         print("Exception when createing vulnerabilityreports: %s\n" % e)
 
             date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%sZ")
 
             for pod_name in vul_list.keys():
+                logger.debug(pod_name) # debug
                 vuls = vul_list[pod_name][0]
                 namespace = vul_list[pod_name][1]
                 image = vul_list[pod_name][2]
@@ -685,6 +723,12 @@ async def create_fn( logger, spec, **kwargs):
                 mediumCount = vuls['MEDIUM']
                 lowCount = vuls['LOW']
                 unknownCount = vuls['UNKNOWN']
+                pre_stat = vuls['ERROR']
+                if pre_stat == 0:
+                    status = "OK"
+                else:
+                    status = "ERROR"
+                
 
                 vr_name = "pod"
                 vr_name += '-'
@@ -714,7 +758,8 @@ async def create_fn( logger, spec, **kwargs):
                             "highCount": highCount,
                             "lowCount": lowCount,
                             "mediumCount": mediumCount,
-                            "unknownCount": unknownCount
+                            "unknownCount": unknownCount,
+                            "status": status
                         },
                         "updateTimestamp": date,
                         "vulnerabilities": []
