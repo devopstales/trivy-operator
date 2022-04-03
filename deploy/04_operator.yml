@@ -29,6 +29,10 @@ spec:
 #        env:
 #        - name: GITHUB_TOKEN
 #          value: MY-TOKEN-FROM-GITHUB
+#        - name: REDIS_ENABLED
+#          value: True
+#        - name: REDIS_BACKEND
+#          value: redis://trivy-cache:6379
         volumeMounts:
         - name: cache
           mountPath: "/home/trivy-operator/trivy-cache/"
