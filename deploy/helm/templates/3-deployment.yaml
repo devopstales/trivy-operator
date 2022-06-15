@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: trivy-operator
+    {{- include "trivy-operator.labels" . | nindent 4 }}
+  name: {{ include "trivy-operator.fullname" . }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: trivy-operator
+      {{- include "trivy-operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: trivy-operator
+        {{- include "trivy-operator.selectorLabels" . | nindent 8 }}
+      annotations:
+        prometheus.io/port: "9115"
+        prometheus.io/scrape: "true"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      serviceAccountName: {{ include "trivy-operator.serviceAccountName" . }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: LOG_LEVEL
+          value: "{{ .Values.log_level }}"
+{{- if .Values.admissionController.enabled }}
+        - name: ADMISSION_CONTROLLER
+          value: "{{ .Values.admissionController.token }}"
+{{- end }}
+{{- if .Values.githubToken.enabled }}
+        - name: GITHUB_TOKEN
+          value: "{{ .Values.githubToken.token }}"
+{{- end }}
+{{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: cache
+          mountPath: "/home/trivy-operator/trivy-cache"
+{{- end }}
+        ports:
+          - name: metric
+            containerPort: 9115
+            protocol: TCP
+          - name: https
+            containerPort: 8443
+            protocol: TCP
+{{- if .Values.persistence.enabled }}
+      volumes:
+      - name: cache
+        persistentVolumeClaim:
+            claimName: {{ include "trivy-operator.fullname" . }}-trivy-cache
+{{- end }}

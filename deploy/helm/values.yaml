@@ -1,0 +1,59 @@
+image:
+  repository: devopstales/trivy-operator
+  pullPolicy: Always
+  tag: "2.3"
+
+log_level: "INFO"
+
+imagePullSecrets: []
+podSecurityContext:
+  fsGroup: 10001
+  fsGroupChangePolicy: "OnRootMismatch"
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "trivy-operator"
+
+monitoring:
+  port: "9115"
+
+serviceMonitor:
+  enabled: false
+  namespace: "kube-system"
+  labels:
+    release: prometheus
+
+persistence:
+  enabled: true
+  accessMode: "ReadWriteOnce"
+  size: "1Gi"
+  annotations: {}
+  ## database data Persistent Volume Storage Class
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  # storageClass: "-"
+
+namespaceScanner:
+  crontab: "*/5 * * * *"
+  namespaceSelector: "trivy-scan"
+  clusterWide: false
+
+admissionController:
+  enabled: false
+
+registryAuth:
+  enabled: false
+  registry:
+  - name: docker.io
+    user: "user"
+    password: "password"
+
+githubToken:
+  enabled: false
+  token: ""
+ 

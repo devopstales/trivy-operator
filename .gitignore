@@ -3,6 +3,7 @@ docker/*.py
 docker/trivy
 old/
 note.md
+test*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

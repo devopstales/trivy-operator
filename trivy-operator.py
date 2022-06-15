@@ -21,10 +21,8 @@ from datetime import datetime, timezone
 # ToDo
 #############################################################################
 # OP
-# cache scanned images ???
 ## update vulnerabilityreport if existing 
 # AC
-# cache scanned images ???
 #############################################################################
 # Global Variables
 #############################################################################

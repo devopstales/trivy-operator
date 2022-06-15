@@ -1,0 +1,17 @@
+apiVersion: trivy-operator.devopstales.io/v1
+kind: NamespaceScanner
+metadata:
+  name: {{ include "trivy-operator.fullname" . }}-main-config
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+spec:
+  crontab: "{{ .Values.namespaceScanner.crontab }}"
+  clusterWide: "{{ .Values.namespaceScanner.clusterWide }}"
+  namespace_selector: "{{ .Values.namespaceScanner.namespaceSelector }}"
+  clusterWide: {{ .Values.namespaceScanner.clusterWide | default "false" }}
+  {{- if .Values.registryAuth.enabled }}
+  {{- with .Values.registryAuth.registry }}
+  registry:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
