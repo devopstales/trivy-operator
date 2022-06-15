@@ -15,6 +15,9 @@ serviceAccount:
   annotations: {}
   name: "trivy-operator"
 
+cache:
+  enabled: false
+
 monitoring:
   port: "9115"
 

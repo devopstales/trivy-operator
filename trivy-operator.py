@@ -46,7 +46,14 @@ IN_CLUSTER = os.getenv("IN_CLUSTER", False)
 IS_GLOBAL = os.getenv("IS_GLOBAL", False)
 AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False)
 REDIS_ENABLED = os.getenv("REDIS_ENABLED", False)
-REDIS_BACKED = os.getenv("REDIS_BACKED")
+if REDIS_ENABLED:
+    REDIS_BACKEND = os.getenv("REDIS_BACKEND")
+    if not REDIS_BACKEND:
+        REDIS_ENABLED = False
+
+        print(f"DEBUG - Redis Cache Enabled: %s" % (REDIS_BACKEND), file=sys.stderr)
+    else:
+        print(f"DEBUG - Redis Cache Enabled: %s" % (REDIS_BACKEND), file=sys.stderr)
 #############################################################################
 # Pretasks
 #############################################################################
@@ -397,7 +404,7 @@ async def startup_fn_crd(logger, **kwargs):
 @kopf.on.startup()
 async def startup_fn_trivy_cache(logger, **kwargs):
     if REDIS_ENABLED:
-        TRIVY_CACHE = ["trivy", "-q", "image", "--cache-backend", REDIS_BACKED, "--download-db-only"]
+        TRIVY_CACHE = ["trivy", "-q", "image", "--cache-backend", REDIS_BACKEND, "--download-db-only"]
     else:
         TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
     trivy_cache_result = (
@@ -436,7 +443,7 @@ async def create_fn( logger, spec, **kwargs):
         logger.debug("namespace-scanners - clusterWide:") # debuglog
         logger.debug(format(clusterWide)) # debuglog
     except:
-        logger.info("clusterWide is not set, checking namespaceSelector option")
+        logger.info("clusterWide is not set, checking namespaceSelector")
         clusterWide = False
 
     namespaceSelector = None
@@ -568,7 +575,7 @@ async def create_fn( logger, spec, **kwargs):
                     logger.info("Active Registry: %s" % (ACTIVE_REGISTRY))
 
                 if REDIS_ENABLED:
-                    TRIVY = ["trivy", "-q", "image", "-f", "json", "--cache-backend", REDIS_BACKED, image_name]
+                    TRIVY = ["trivy", "-q", "image", "-f", "json", "--cache-backend", REDIS_BACKEND, image_name]
                 else:
                     TRIVY = ["trivy", "-q", "image", "-f", "json", image_name]
                 # --ignore-policy trivy.rego
@@ -640,6 +647,7 @@ async def create_fn( logger, spec, **kwargs):
                                 "CRITICAL": 0, "ERROR": 0}
                         item_list = trivy_result['Results'][0]["Vulnerabilities"]
                         for item in item_list:
+                            
                             CONTAINER_VULN.labels(
                                 ns_name,
                                 pod_name,
@@ -655,9 +663,13 @@ async def create_fn( logger, spec, **kwargs):
                                 score = item["CVSS"]["nvd"]["V3Score"]
                             except:
                                 try:
-                                    score = tem["CVSS"]["redhat"]["V3Score"]
+                                    score = item["CVSS"]["redhat"]["V3Score"]
                                 except:
                                     score = 0
+                            try:
+                                title = item["Title"]
+                            except:
+                                title = item["Description"]
 
                             vuls_long = {
                                 "vulnerabilityID": item["VulnerabilityID"],
@@ -667,7 +679,7 @@ async def create_fn( logger, spec, **kwargs):
                                 "severity": item["Severity"],
                                 "score": score,
                                 "links": item["References"],
-                                "title": item["Title"],
+                                "title": title,
                             }
                             vul_report[pod_name] = [vuls_long]
                         vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
@@ -1082,7 +1094,7 @@ if AC_ENABLED:
 
             """Scan Images"""
             if REDIS_ENABLED:
-                TRIVY = ["trivy", "-q", "image", "-f", "json", "--cache-backend", REDIS_BACKED, image_name]
+                TRIVY = ["trivy", "-q", "image", "-f", "json", "--cache-backend", REDIS_BACKEND, image_name]
             else:
                 TRIVY = ["trivy", "-q", "image", "-f", "json", image_name]
             # --ignore-policy trivy.rego

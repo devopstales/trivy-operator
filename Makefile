@@ -1,12 +1,18 @@
 codeSHELL=/bin/bash -o pipefail
-export VERSION=2.3
+export VERSION=2.4
 
 .PHONY:	all
-all:	 latest version
+all:	 trivy
 
-.DEFAULT_GOAL := all
+.DEFAULT_GOAL := help
+
 TRIVY := $(shell curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d "v" -f2)
 
+#help:	@ List available tasks on this project
+help:
+	@grep -E '[a-zA-Z\.\-]+:.*?@ .*$$' $(MAKEFILE_LIST)| tr -d '#'  | awk 'BEGIN {FS = ":.*?@ "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+#trivy:	@ download trivy binary
 trivy:
 	@if [ ! -f /tmp/trivy ]; then \
 		echo "Get Trivy Version:"; \
@@ -18,12 +24,14 @@ trivy:
 	rm -f docker/trivy
 	cp /tmp/trivy docker/trivy
 
+#devel:	@ Build local devel image with kim
 devel:
 	cp trivy-operator.py docker/trivy-operator.py
 	kim build --tag devopstales/trivy-operator:$(VERSION)-devel docker/
 	rm docker/trivy-operator.py
 	rm -f docker/trivy-operator.py
 
+#devel-delete:	@ Delete local dev image with kim
 devel-delete:
 	kim image rm devopstales/trivy-operator:$(VERSION)-devel
 
