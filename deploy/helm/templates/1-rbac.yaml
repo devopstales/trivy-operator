@@ -15,7 +15,9 @@ rules:
   resources:
   - vulnerabilityreports
   verbs:
+    - get
     - create
+    - delete
 - apiGroups:
    - "trivy-operator.devopstales.io"
   resources:

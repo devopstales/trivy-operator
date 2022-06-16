@@ -16,13 +16,8 @@ from typing import AsyncIterator, Optional, Tuple, Collection
 from datetime import datetime
 from OpenSSL import crypto
 from datetime import datetime, timezone
+import logging
 
-#############################################################################
-# ToDo
-#############################################################################
-# OP
-## update vulnerabilityreport if existing 
-# AC
 #############################################################################
 # Global Variables
 #############################################################################
@@ -54,6 +49,30 @@ if REDIS_ENABLED:
         print(f"DEBUG - Redis Cache Enabled: %s" % (REDIS_BACKEND), file=sys.stderr)
     else:
         print(f"DEBUG - Redis Cache Enabled: %s" % (REDIS_BACKEND), file=sys.stderr)
+
+#############################################################################
+# Logging
+#############################################################################
+
+VERBOSE_LOG = os.getenv("VERBOSE_LOG", False)
+FORMAT = '[%(asctime)s] %(name)s         [VERBOSE_LOG] %(message)s'
+
+logging.basicConfig(format=FORMAT)
+MyLogger = logging.getLogger("trivy-operator")
+MyLogger.setLevel(logging.WARNING)
+
+if VERBOSE_LOG:
+    MyLogger.setLevel(logging.INFO)
+
+
+level = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_LEVEL = logging.getLevelName(level)
+
+"""Set Log Level"""
+@kopf.on.startup()
+def configure(settings: kopf.OperatorSettings, **_):
+    settings.posting.level = LOG_LEVEL
+
 #############################################################################
 # Pretasks
 #############################################################################
@@ -117,6 +136,69 @@ async def create_fn( logger, spec, **kwargs):
         logger.error("Either clusterWide need to be set to 'true' or namespace_selector should be set")
         raise kopf.PermanentError("Either clusterWide need to be set to 'true' or namespace_selector should be set")
 
+    """Generate VulnerabilityReport"""
+    def create_vulnerabilityreports(body, namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.CustomObjectsApi(api_client)
+            group = 'trivy-operator.devopstales.io'
+            version = 'v1'
+            plural = 'vulnerabilityreports'
+            pretty = 'true'
+            field_manager = 'trivy-operator'
+            body = body
+            namespace = namespace
+        try:
+            api_response = api_instance.create_namespaced_custom_object(
+                group, version, namespace, plural, body, pretty=pretty, field_manager=field_manager)
+            MyLogger.info("New vulnerabilityReport created") # WARNING
+        except ApiException as e:
+            if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
+                logger.info("VulnerabilityReport %s already exists!!!" % name)
+            else:
+                print("Exception when createing vulnerabilityreport - %s : %s\n" % (name, e))
+
+    """Test VulnerabilityReport"""
+    def get_vulnerabilityreports(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.CustomObjectsApi(api_client)
+            group = 'trivy-operator.devopstales.io'
+            version = 'v1'
+            plural = 'vulnerabilityreports'
+        try:
+            api_response = api_instance.get_namespaced_custom_object(
+                group, version, namespace, plural, name
+            )
+            MyLogger.info("api_response: %s" % api_response) # WARNING
+            return True
+        except ApiException as e:
+            if e:
+                print("Exception when testing vulnerabilityreport - %s : %s\n" % (name, e))
+                return False
+            else:
+                return False
+
+    """Delete VulnerabilityReport"""
+    def delete_vulnerabilityreports(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.CustomObjectsApi(api_client)
+            group = 'trivy-operator.devopstales.io'
+            version = 'v1'
+            plural = 'vulnerabilityreports'
+        try:
+            api_response = api_instance.delete_namespaced_custom_object(
+                group, version, namespace, plural, name)
+        except ApiException as e:
+            print("Exception when deleting vulnerabilityreport - %s : %s\n" % (name, e))
+
+    if IN_CLUSTER:
+        k8s_config.load_incluster_config()
+    else:
+        k8s_config.load_kube_config()
+
+    ############################################
+    # start crontab
+    ############################################
+
     while True:
         if pycron.is_now(crontab):
             """Find Namespaces"""
@@ -126,11 +208,6 @@ async def create_fn( logger, spec, **kwargs):
             vul_list = {}
             vul_report = {}
             tagged_ns_list = []
-
-            if IN_CLUSTER:
-                k8s_config.load_incluster_config()
-            else:
-                k8s_config.load_kube_config()
 
             namespace_list = k8s_client.CoreV1Api().list_namespace()
             logger.debug("namespace list begin:") # debuglog
@@ -209,7 +286,7 @@ async def create_fn( logger, spec, **kwargs):
                         continue
 
             """Scan images"""
-            logger.info("image list begin:")
+            logger.info("image list begin:") 
             for image_name in unique_image_list:
                 logger.info("Scanning Image: %s" % (image_name))
 
@@ -229,7 +306,7 @@ async def create_fn( logger, spec, **kwargs):
                                 os.environ['TRIVY_USERNAME'] = reg['user']
                                 os.environ['TRIVY_PASSWORD'] = reg['password']
                 except:
-                    logger.debug("No registry auth config is defined.") # debuglog
+                    logger.debug("No registry auth config is defined.") # debug
                     ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
                     logger.info("Active Registry: %s" % (ACTIVE_REGISTRY))
 
@@ -268,7 +345,7 @@ async def create_fn( logger, spec, **kwargs):
                     trivy_result_list[image_name] = trivy_result
             logger.info("image list end:")
 
-
+            MyLogger.info("result begin:") # WARNING
             for pod_name in pod_list:
                 image_name = pod_list[pod_name][0]
                 image_id = pod_list[pod_name][1]
@@ -294,11 +371,9 @@ async def create_fn( logger, spec, **kwargs):
                     }
                     vul_report[pod_name] = [vuls_long]
                     vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
-                    logger.debug("result begin:") # debuglog
-                    logger.debug(pod_name) # debuglog
+                    MyLogger.info(pod_name) # WARNING
                     logger.debug(vul_report[pod_name]) # debuglog
                     logger.debug(vul_list[pod_name]) # debuglog
-                    logger.debug("result end:") # debuglog
                 else:
                     if 'Results' in trivy_result and 'Vulnerabilities' in trivy_result['Results'][0]:
                         vuls = {"UNKNOWN": 0, "LOW": 0,
@@ -342,11 +417,9 @@ async def create_fn( logger, spec, **kwargs):
                             }
                             vul_report[pod_name] = [vuls_long]
                         vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
-                        logger.debug("result begin:") # debuglog
-                        logger.debug(pod_name) # debuglog
+                        MyLogger.info(pod_name) # WARNING
                         logger.debug(vul_report[pod_name]) # debuglog
                         logger.debug(vul_list[pod_name]) # debuglog
-                        logger.debug("result end:") # debuglog
                     elif 'Results' in trivy_result and 'Vulnerabilities' not in trivy_result['Results'][0]:
                         # For Alpine Linux
                         vuls = {"UNKNOWN": 0, "LOW": 0,
@@ -364,31 +437,10 @@ async def create_fn( logger, spec, **kwargs):
                         }
                         vul_report[pod_name] = [vuls_long]
                         vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
-                        logger.debug("result begin:") # debuglog
-                        logger.debug(pod_name) # debuglog
+                        MyLogger.info(pod_name) # WARNING
                         logger.debug(vul_report[pod_name]) # debuglog
                         logger.debug(vul_list[pod_name]) # debuglog
-                        logger.debug("result end:") # debuglog
-
-            """Generate VulnerabilityReport"""
-            def create_vulnerabilityreports(body, namespace):
-                with k8s_client.ApiClient() as api_client:
-                    api_instance = k8s_client.CustomObjectsApi(api_client)
-                    group = 'trivy-operator.devopstales.io'
-                    version = 'v1'
-                    plural = 'vulnerabilityreports'
-                    pretty = 'true'
-                    field_manager = 'trivy-operator'
-                    body = body
-                    namespace = namespace
-                try:
-                    api_response = api_instance.create_namespaced_custom_object(
-                        group, version, namespace, plural, body, pretty=pretty, field_manager=field_manager)
-                except ApiException as e:
-                    if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
-                        logger.info("VulnerabilityReport already exists!!!")
-                    else:
-                        print("Exception when createing vulnerabilityreports: %s\n" % e)
+            MyLogger.info("result end:") # WARNING
 
             date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%sZ")
 
@@ -424,10 +476,10 @@ async def create_fn( logger, spec, **kwargs):
                 vr_name += pod_name.split('_')[1]
                 # pod-[nginx]-container-[init]
 
-                logger.debug("Generate VR begin:") # debug
-                logger.debug(pod_name) # debug
+                MyLogger.info("Generate VR begin:") # DEBUG!
+                MyLogger.info(pod_name) # DEBUG!
                 logger.debug(vul_list[pod_name]) # debug
-                logger.debug("Generate VR end:") # debug
+                MyLogger.info("Generate VR end:") # DEBUG!
 
                 vulnerabilityReport = {
                     "apiVersion": "trivy-operator.devopstales.io/v1",
@@ -471,8 +523,14 @@ async def create_fn( logger, spec, **kwargs):
                     }
                 }
                 vulnerabilityReport["report"]["vulnerabilities"] = vul_report[pod_name]
-#                logger.info(vulnerabilityReport) # debug
-                create_vulnerabilityreports(vulnerabilityReport, namespace)
+                is_report_exists = get_vulnerabilityreports(namespace, vr_name)
+                MyLogger.info("DEBUG - is_report_exists: %s" % is_report_exists) # WARNING
+                if is_report_exists:
+                    MyLogger.info("vulnerabilityReport need deletion") # WARNING
+                    delete_vulnerabilityreports(namespace, vr_name)
+                    create_vulnerabilityreports(vulnerabilityReport, namespace, vr_name)
+                else:
+                    create_vulnerabilityreports(vulnerabilityReport, namespace, vr_name)
 
 
             """Generate Metricfile"""
@@ -482,6 +540,7 @@ async def create_fn( logger, spec, **kwargs):
                         vul_list[pod_name][1],
                         vul_list[pod_name][2], severity).set(int(vul_list[pod_name][0][severity])
                                                   )
+            MyLogger.info("------------------------------------------") # WARNING
             await asyncio.sleep(15)
         else:
             await asyncio.sleep(15)
@@ -646,7 +705,7 @@ if AC_ENABLED:
                     daysToExpiration = (certExpires - datetime.now()).days
                     logger.info("Day to certifiacet expiration: %s" % daysToExpiration)  # infolog
                     if daysToExpiration <= 7:  # debug 365
-                        logger.warning("Certificate Expires soon. Regenerating.")
+                        MyLogger.info("Certificate Expires soon. Regenerating.")
                         # delete cert file
                         os.remove(cert_file)
                         os.remove(key_file)
@@ -731,7 +790,7 @@ if AC_ENABLED:
         """Get Images"""
         for image_name in image_list:
             registry = image_name.split('/')[0]
-            logger.info("Scanning Image: %s" % (image_name))
+            logger.info("Scanning Image: %s" % (image_name)) # info
 
             """Login to registry"""
             try:
@@ -747,7 +806,7 @@ if AC_ENABLED:
                             os.environ['TRIVY_USERNAME'] = reg['user']
                             os.environ['TRIVY_PASSWORD'] = reg['password']
             except:
-                logger.info("No registry auth config is defined.")
+                logger.info("No registry auth config is defined.") # info
             ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
             logger.debug("Active Registry: %s" % (ACTIVE_REGISTRY)) # debuglog
 
@@ -793,7 +852,7 @@ if AC_ENABLED:
                 vul_list[image_name] = [vuls, namespace]
 
             """Generate log"""
-            logger.info("severity: %s" % (vul_list[image_name][0]))  # Logging
+            logger.info("severity: %s" % (vul_list[image_name][0]))  # info
 
             """Generate Metricfile"""
             for image_name in vul_list.keys():

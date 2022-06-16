@@ -20,10 +20,8 @@ spec:
           fsGroup: 10001
           fsGroupChangePolicy: "OnRootMismatch"
       serviceAccountName: trivy-operator
-      nodeSelector:
-        node-role.kubernetes.io/builder: "true"
       containers:
-      - image: devopstales/trivy-operator:2.4-devel
+      - image: devopstales/trivy-operator:2.3
         imagePullPolicy: IfNotPresent
         name: trivy-operator
         env:
