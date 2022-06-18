@@ -27,9 +27,9 @@ User the [helm Chert](https://github.com/devopstales/helm-charts)
 kubectl label namespaces guestbook-demo trivy-scan=true
 kubectl label namespaces guestbook-demo trivy-operator-validation=true
 # or
-kubectl apply -f deploy/10_demo.yaml
+kubectl apply -f deploy/kubernetes/10_demo.yaml
 
-kubectl apply -f deploy/04_trivy-config.yaml
+kubectl apply -f deploy/kubernetes/04_trivy-config.yaml
 ```
 
 ~~~text

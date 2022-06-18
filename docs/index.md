@@ -1,0 +1,3 @@
+# What is trivy-operator?
+
+Trivy-operator is a Kubernetes Operator based on the open-source container vulnerability scanner [Trivy](https://aquasecurity.github.io/trivy/). The goal of this project is to provide a vulnerability scanner that continuously scans containers deployed in a Kubernetes cluster. [Built with Kubernetes Operator Pythonic Framework (Kopf)](https://github.com/nolar/kopf) There are a few solution for checking the images when you deploy them to the Kubernetes cluster, but fighting against vulnerabilities is a day to day task. Check once is not enough when every day is a new das for frats. That is why I created trivy-operator so you can create scheduled image scans on your running pods.
