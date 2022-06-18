@@ -15,6 +15,14 @@ rules:
   verbs:
     - create
 - apiGroups:
+   - "wgpolicyk8s.io"
+  resources:
+  - policyreports
+  verbs:
+    - get
+    - create
+    - delete
+- apiGroups:
    - "trivy-operator.devopstales.io"
   resources:
   - vulnerabilityreports
@@ -46,6 +54,17 @@ rules:
   - pods
   - namespaces
   verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - "admissionregistration.k8s.io"
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - create
+  - patch
   - get
   - watch
   - list

@@ -11,6 +11,14 @@ rules:
   verbs:
     - create
 - apiGroups:
+   - "wgpolicyk8s.io"
+  resources:
+  - policyreports
+  verbs:
+    - get
+    - create
+    - delete
+- apiGroups:
    - "trivy-operator.devopstales.io"
   resources:
   - vulnerabilityreports

@@ -19,6 +19,29 @@ from datetime import datetime, timezone
 import logging
 
 #############################################################################
+# Logging
+#############################################################################
+
+VERBOSE_LOG = os.getenv("VERBOSE_LOG", False)
+FORMAT = '[%(asctime)s] %(name)s         [VERBOSE_LOG] %(message)s'
+
+logging.basicConfig(format=FORMAT)
+MyLogger = logging.getLogger("trivy-operator")
+MyLogger.setLevel(logging.WARNING)
+
+if VERBOSE_LOG:
+    MyLogger.setLevel(logging.INFO)
+
+
+level = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_LEVEL = logging.getLevelName(level)
+
+"""Set Log Level"""
+@kopf.on.startup()
+def configure(settings: kopf.OperatorSettings, **_):
+    settings.posting.level = LOG_LEVEL
+
+#############################################################################
 # Global Variables
 #############################################################################
 CONTAINER_VULN_SUM = prometheus_client.Gauge(
@@ -46,32 +69,9 @@ if REDIS_ENABLED:
     if not REDIS_BACKEND:
         REDIS_ENABLED = False
 
-        print(f"DEBUG - Redis Cache Enabled: %s" % (REDIS_BACKEND), file=sys.stderr)
+        MyLogger.warning("Redis Cache Disabled: %s" % (REDIS_BACKEND))
     else:
-        print(f"DEBUG - Redis Cache Enabled: %s" % (REDIS_BACKEND), file=sys.stderr)
-
-#############################################################################
-# Logging
-#############################################################################
-
-VERBOSE_LOG = os.getenv("VERBOSE_LOG", False)
-FORMAT = '[%(asctime)s] %(name)s         [VERBOSE_LOG] %(message)s'
-
-logging.basicConfig(format=FORMAT)
-MyLogger = logging.getLogger("trivy-operator")
-MyLogger.setLevel(logging.WARNING)
-
-if VERBOSE_LOG:
-    MyLogger.setLevel(logging.INFO)
-
-
-level = os.getenv('LOG_LEVEL', 'INFO').upper()
-LOG_LEVEL = logging.getLevelName(level)
-
-"""Set Log Level"""
-@kopf.on.startup()
-def configure(settings: kopf.OperatorSettings, **_):
-    settings.posting.level = LOG_LEVEL
+        MyLogger.warning("Redis Cache Enabled: %s" % (REDIS_BACKEND))
 
 #############################################################################
 # Pretasks
@@ -155,7 +155,7 @@ async def create_fn( logger, spec, **kwargs):
             if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
                 logger.info("VulnerabilityReport %s already exists!!!" % name)
             else:
-                print("Exception when createing vulnerabilityreport - %s : %s\n" % (name, e))
+                print("Exception when creating VulnerabilityReport - %s : %s\n" % (name, e))
 
     """Test VulnerabilityReport"""
     def get_vulnerabilityreports(namespace, name):
@@ -171,8 +171,8 @@ async def create_fn( logger, spec, **kwargs):
             MyLogger.info("api_response: %s" % api_response) # WARNING
             return True
         except ApiException as e:
-            if e:
-                print("Exception when testing vulnerabilityreport - %s : %s\n" % (name, e))
+            if e.status != 404:
+                print("Exception when testing VulnerabilityReport - %s : %s\n" % (name, e))
                 return False
             else:
                 return False
@@ -188,7 +188,61 @@ async def create_fn( logger, spec, **kwargs):
             api_response = api_instance.delete_namespaced_custom_object(
                 group, version, namespace, plural, name)
         except ApiException as e:
-            print("Exception when deleting vulnerabilityreport - %s : %s\n" % (name, e))
+            print("Exception when deleting VulnerabilityReport - %s : %s\n" % (name, e))
+
+    """Test policyReport"""
+    def get_policyreports(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.CustomObjectsApi(api_client)
+            group = 'wgpolicyk8s.io'
+            version = 'v1alpha2'
+            plural = 'policyreports'
+        try:
+            api_response = api_instance.get_namespaced_custom_object(
+                group, version, namespace, plural, name
+            )
+            MyLogger.info("api_response: %s" % api_response) # WARNING
+            return True
+        except ApiException as e:
+            if e.status != 404:
+                print("Exception when testing policyReport - %s : %s\n" % (name, e))
+                return False
+            else:
+                return False
+
+    """Generate policyReport"""
+    def create_policyreports(body, namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.CustomObjectsApi(api_client)
+            group = 'wgpolicyk8s.io'
+            version = 'v1alpha2'
+            plural = 'policyreports'
+            pretty = 'true'
+            field_manager = 'trivy-operator'
+            body = body
+            namespace = namespace
+        try:
+            api_response = api_instance.create_namespaced_custom_object(
+                group, version, namespace, plural, body, pretty=pretty, field_manager=field_manager)
+            MyLogger.info("New policyReport created") # WARNING
+        except ApiException as e:
+            if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
+                logger.info("policyReport %s already exists!!!" % name)
+            else:
+                print("Exception when creating policyReport - %s : %s\n" % (name, e))
+
+    """Delete policyReport"""
+    def delete_policyreports(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.CustomObjectsApi(api_client)
+            group = 'wgpolicyk8s.io'
+            version = 'v1alpha2'
+            plural = 'policyreports'
+        try:
+            api_response = api_instance.delete_namespaced_custom_object(
+                group, version, namespace, plural, name)
+        except ApiException as e:
+            print("Exception when deleting policyReport - %s : %s\n" % (name, e))
 
     if IN_CLUSTER:
         k8s_config.load_incluster_config()
@@ -208,6 +262,7 @@ async def create_fn( logger, spec, **kwargs):
             vul_list = {}
             vul_report = {}
             tagged_ns_list = []
+            policy_report = {}
 
             namespace_list = k8s_client.CoreV1Api().list_namespace()
             logger.debug("namespace list begin:") # debuglog
@@ -358,7 +413,8 @@ async def create_fn( logger, spec, **kwargs):
                 if trivy_result == "ERROR":
                     vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
-                                "CRITICAL": 0, "ERROR": 1}
+                                "CRITICAL": 0, "ERROR": 1,
+                                "NONE": 0}
                     vuls_long = {
                         "installedVersion": "",
                         "links": [],
@@ -369,8 +425,35 @@ async def create_fn( logger, spec, **kwargs):
                         "title": "Image Scanning Error",
                         "vulnerabilityID": ""
                     }
+                    report = {
+                        "category": "Vulnerability Scan",
+                        "message": "Image Scanning Error",
+                        "policy": "Image Vulnerability",
+                        "rule": item["VulnerabilityID"],
+                        "properties": {
+                            "registry.server": image_name.split('/')[0],
+                            "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2],
+                            "artifact.tag": image_name.split(':')[-1],
+                        },
+                        "resources": [],
+                        "severity": "error",
+                        "result": "error",
+                        "source": "Trivy Vulnerability"
+                    }
+                    report["resources"] = [
+                        {
+                            "apiVersion": "v1",
+                            "kind": "Pod",
+                            "name": pod_name,
+                            "namespace": ns_name,
+                            "uid": pod_uid,
+                        }
+                    ]
+
                     vul_report[pod_name] = [vuls_long]
+                    policy_report[pod_name] = [report]
                     vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
+
                     MyLogger.info(pod_name) # WARNING
                     logger.debug(vul_report[pod_name]) # debuglog
                     logger.debug(vul_list[pod_name]) # debuglog
@@ -378,7 +461,8 @@ async def create_fn( logger, spec, **kwargs):
                     if 'Results' in trivy_result and 'Vulnerabilities' in trivy_result['Results'][0]:
                         vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
-                                "CRITICAL": 0, "ERROR": 0}
+                                "CRITICAL": 0, "ERROR": 0,
+                                "NONE": 0}
                         item_list = trivy_result['Results'][0]["Vulnerabilities"]
                         for item in item_list:
                             
@@ -405,6 +489,13 @@ async def create_fn( logger, spec, **kwargs):
                             except:
                                 title = item["Description"]
 
+                            if "CRITICAL" or "HIGH" in item["Severity"]:
+                                result = "fail"
+                            elif "MEDIUM" or "LOW" in item["Severity"]:
+                                result = "warn"
+                            elif "UNKNOWN" in item["Severity"]:
+                                result = "skip"
+
                             vuls_long = {
                                 "vulnerabilityID": item["VulnerabilityID"],
                                 "resource": item["PkgName"],
@@ -415,8 +506,38 @@ async def create_fn( logger, spec, **kwargs):
                                 "links": item["References"],
                                 "title": title,
                             }
+                            report = {
+                                "category": "Vulnerability Scan",
+                                "message": title,
+                                "policy": "Image Vulnerability",
+                                "rule": item["VulnerabilityID"],
+                                "properties": {
+                                    "registry.server": image_name.split('/')[0],
+                                    "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2],
+                                    "artifact.tag": image_name.split(':')[-1],
+                                    "resource": item["PkgName"],
+                                    "score": str(score),
+                                    "primaryLink": item["PrimaryURL"],
+                                    "installedVersion": item["InstalledVersion"],
+                                },
+                                "resources": [],
+                                "severity": item["Severity"].lower(),
+                                "result": result,
+                                "source": "Trivy Vulnerability"
+                            }
+                            report["resources"] = [
+                                {
+                                    "apiVersion": "v1",
+                                    "kind": "Pod",
+                                    "name": pod_name,
+                                    "namespace": ns_name,
+                                    "uid": pod_uid,
+                                }
+                            ]
                             vul_report[pod_name] = [vuls_long]
+                            policy_report[pod_name] = [report]
                         vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
+
                         MyLogger.info(pod_name) # WARNING
                         logger.debug(vul_report[pod_name]) # debuglog
                         logger.debug(vul_list[pod_name]) # debuglog
@@ -424,7 +545,8 @@ async def create_fn( logger, spec, **kwargs):
                         # For Alpine Linux
                         vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
-                                "CRITICAL": 0, "ERROR": 0}
+                                "CRITICAL": 0, "ERROR": 0,
+                                "NONE": 1}
                         vuls_long = {
                             "installedVersion": "",
                             "links": [],
@@ -435,8 +557,33 @@ async def create_fn( logger, spec, **kwargs):
                             "title": "There ins no vulnerability in this image",
                             "vulnerabilityID": ""
                         }
+                        report = {
+                            "category": "Vulnerability Scan",
+                            "message": "There ins no vulnerability in this image",
+                            "policy": "Image Vulnerability",
+                            "rule": item["VulnerabilityID"],
+                            "properties": {
+                                "registry.server": image_name.split('/')[0],
+                                "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2],
+                                "artifact.tag": image_name.split(':')[-1],
+                            },
+                            "resources": [],
+                            "result": "pass",
+                            "source": "Trivy Vulnerability"
+                        }
+                        report["resources"] = [
+                            {
+                                "apiVersion": "v1",
+                                "kind": "Pod",
+                                "name": pod_name,
+                                "namespace": ns_name,
+                                "uid": pod_uid,
+                            }
+                        ]
                         vul_report[pod_name] = [vuls_long]
+                        policy_report[pod_name] = [report]
                         vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
+
                         MyLogger.info(pod_name) # WARNING
                         logger.debug(vul_report[pod_name]) # debuglog
                         logger.debug(vul_list[pod_name]) # debuglog
@@ -523,14 +670,60 @@ async def create_fn( logger, spec, **kwargs):
                     }
                 }
                 vulnerabilityReport["report"]["vulnerabilities"] = vul_report[pod_name]
-                is_report_exists = get_vulnerabilityreports(namespace, vr_name)
-                MyLogger.info("DEBUG - is_report_exists: %s" % is_report_exists) # WARNING
-                if is_report_exists:
+
+                pr_name = ( "trivy-vuln-" + vr_name )
+                policyReport = {
+                    "apiVersion": "wgpolicyk8s.io/v1alpha2",
+                    "kind": "PolicyReport",
+                    "metadata": {
+                        "name": pr_name,
+                        "labels": {
+                            "trivy-operator.pod.namespace": namespace,
+                            "trivy-operator.pod.name": pod_name.split('_')[0],
+                            "trivy-operator.container.name": pod_name.split('_')[1]
+                        },
+                        "ownerReferences": [
+                            {
+                                "apiVersion": "v1",
+                                "kind": "Pod",
+                                "name": pod_name.split('_')[0],
+                                "uid": pod_uid,
+                                "blockOwnerDeletion": False,
+                                "controller": True,
+                            }
+                       ]
+                    },
+                    "results": [],
+                    "summary": {
+                        "error": vuls['ERROR'],
+                        "fail": ( criticalCount + highCount ),
+                        "pass": vuls['NONE'],
+                        "skip": unknownCount,
+                        "warn": ( mediumCount + lowCount ),
+                    },
+                }
+
+                policyReport["results"] = policy_report[pod_name]
+
+                is_vulnerabilityreport_exists = get_vulnerabilityreports(namespace, vr_name)
+                MyLogger.info("DEBUG - is_vulnerabilityreport_exists: %s" % is_vulnerabilityreport_exists) # WARNING
+
+                if is_vulnerabilityreport_exists:
                     MyLogger.info("vulnerabilityReport need deletion") # WARNING
                     delete_vulnerabilityreports(namespace, vr_name)
                     create_vulnerabilityreports(vulnerabilityReport, namespace, vr_name)
                 else:
                     create_vulnerabilityreports(vulnerabilityReport, namespace, vr_name)
+
+                is_policyreports_exists = get_policyreports(namespace, pr_name)
+                MyLogger.info("DEBUG - is_policyreports_exists: %s" % is_policyreports_exists) # WARNING
+
+                if is_policyreports_exists:
+                    MyLogger.info("policyReport need deletion") # WARNING
+                    delete_policyreports(namespace, pr_name)
+                    create_policyreports(policyReport, namespace, pr_name)
+                else:
+                    create_policyreports(policyReport, namespace, pr_name)
 
 
             """Generate Metricfile"""
