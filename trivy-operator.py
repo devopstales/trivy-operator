@@ -22,7 +22,7 @@ import logging
 # Logging
 #############################################################################
 
-VERBOSE_LOG = os.getenv("VERBOSE_LOG", False)
+VERBOSE_LOG = os.getenv("VERBOSE_LOG", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 FORMAT = '[%(asctime)s] %(name)s         [VERBOSE_LOG] %(message)s'
 
 logging.basicConfig(format=FORMAT)
@@ -60,10 +60,10 @@ AC_VULN = prometheus_client.Gauge(
     'Admission Controller vulnerabilities',
     ['exported_namespace', 'image', 'severity']
 )
-IN_CLUSTER = os.getenv("IN_CLUSTER", False)
-IS_GLOBAL = os.getenv("IS_GLOBAL", False)
-AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False)
-REDIS_ENABLED = os.getenv("REDIS_ENABLED", False)
+IN_CLUSTER = os.getenv("IN_CLUSTER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
+IS_GLOBAL = os.getenv("IS_GLOBAL", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
+AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
+REDIS_ENABLED = os.getenv("REDIS_ENABLED", FalFalse) in ('true', '1', 'True', 't', 'yes', 'Yes')
 if REDIS_ENABLED:
     REDIS_BACKEND = os.getenv("REDIS_BACKEND")
     if not REDIS_BACKEND:
@@ -299,9 +299,13 @@ async def create_fn( logger, spec, **kwargs):
                             pod_name += '_'
                             pod_name += image.name
                             pod_list[pod_name] = list()
-                            image_name = image.image
+                            image_name_temp = image.image
                             image_id = image.image_id
                             pod_uid = pod.metadata.uid
+                            if image_name_temp.startswith('sha256'):
+                                image_name = image_id
+                            else:
+                                image_name = image_name_temp
                             pod_list[pod_name].append(image_name)
                             pod_list[pod_name].append(image_id)
                             pod_list[pod_name].append(tagged_ns)
@@ -324,9 +328,13 @@ async def create_fn( logger, spec, **kwargs):
                             pod_name += '_'
                             pod_name += image.name
                             pod_list[pod_name] = list()
-                            image_name = image.image
+                            image_name_temp = image.image
                             image_id = image.image_id
                             pod_uid = pod.metadata.uid
+                            if image_name_temp.startswith('sha256'):
+                                image_name = image_id
+                            else:
+                                image_name = image_name_temp
                             pod_list[pod_name].append(image_name)
                             pod_list[pod_name].append(image_id)
                             pod_list[pod_name].append(tagged_ns)
@@ -488,6 +496,10 @@ async def create_fn( logger, spec, **kwargs):
                                 title = item["Title"]
                             except:
                                 title = item["Description"]
+                            try:
+                                pLink = item["PrimaryURL"]
+                            except:
+                                pLink = ""
 
                             if "CRITICAL" or "HIGH" in item["Severity"]:
                                 result = "fail"
@@ -500,7 +512,7 @@ async def create_fn( logger, spec, **kwargs):
                                 "vulnerabilityID": item["VulnerabilityID"],
                                 "resource": item["PkgName"],
                                 "installedVersion": item["InstalledVersion"],
-                                "primaryLink": item["PrimaryURL"],
+                                "primaryLink": pLink,
                                 "severity": item["Severity"],
                                 "score": score,
                                 "links": item["References"],
