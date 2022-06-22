@@ -442,7 +442,7 @@ async def create_fn( logger, spec, **kwargs):
                         "rule": item["VulnerabilityID"],
                         "properties": {
                             "registry.server": image_name.split('/')[0],
-                            "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],,
+                            "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],
                             "artifact.tag": image_name.split(':')[-1],
                         },
                         "resources": [],
@@ -527,7 +527,7 @@ async def create_fn( logger, spec, **kwargs):
                                 "rule": item["VulnerabilityID"],
                                 "properties": {
                                     "registry.server": image_name.split('/')[0],
-                                    "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],,
+                                    "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],
                                     "artifact.tag": image_name.split(':')[-1],
                                     "resource": item["PkgName"],
                                     "score": str(score),
@@ -578,7 +578,7 @@ async def create_fn( logger, spec, **kwargs):
                             "rule": item["VulnerabilityID"],
                             "properties": {
                                 "registry.server": image_name.split('/')[0],
-                                "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],,
+                                "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],
                                 "artifact.tag": image_name.split(':')[-1],
                             },
                             "resources": [],
