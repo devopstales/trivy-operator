@@ -17,10 +17,6 @@ nav:
 theme:
   name: material
   language: "en"
-  features:
-#    - navigation.tabs
-    - navigation.tabs.sticky
-    - navigation.sections
 
 markdown_extensions:
   - pymdownx.highlight
@@ -32,6 +28,11 @@ markdown_extensions:
   - def_list
   - pymdownx.details
 
+extra:
+  generator: false
+  version:
+    method: mike
+    provider: mike
 
 plugins:
   - search

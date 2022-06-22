@@ -1,0 +1,45 @@
+name: Publish documentation
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The branch, tag or SHA to deploy
+        required: true
+      version:
+        description: Version to be deployed
+        required: false
+
+permissions: {}
+
+jobs:
+  deploy:
+    name: Deploy documentation
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+      - name: Install dependencies
+        run: |
+          pip install -r docs/build/requirements.txt
+      - name: Configure the git user
+        run: |
+          git config user.name "devopstales-bot"
+          git config user.email "devopstales-bot@users.noreply.github.com"
+      - name: Deploy the latest documents from new tag push
+        if: ${{ github.event.inputs.version == '' }}
+        run: |
+          VERSION=$(echo ${{ github.ref }} | sed -e "s#refs/tags/##g")
+          mike deploy --push $VERSION
+      - name: Deploy the latest documents from manual trigger
+        if: ${{ github.event.inputs.version != '' }}
+        run: mike deploy --push ${{ github.event.inputs.version }}
