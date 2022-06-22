@@ -59,4 +59,4 @@ registryAuth:
 githubToken:
   enabled: false
   token: ""
- 
+

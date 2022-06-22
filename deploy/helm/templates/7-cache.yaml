@@ -32,7 +32,7 @@ spec:
       volumes:
       - name: cache
         persistentVolumeClaim:
-            claimName: "redis-cache"
+            claimName: "{{ include "trivy-operator.fullname" . }}-cache"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
