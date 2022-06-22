@@ -31,6 +31,7 @@ markdown_extensions:
 extra:
   generator: false
   version:
+    default: latest
     method: mike
     provider: mike
 
