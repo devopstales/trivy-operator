@@ -37,3 +37,4 @@ jobs:
           mike deploy --push devel
           mike deploy --push --update-aliases $VERSION latest
           mike set-default --push latest
+# test
