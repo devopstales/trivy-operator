@@ -4,9 +4,6 @@ on:
     tags:
       - "v*"
 
-env:
-  VERSION: ${GITHUB_REF#refs/tags/v}
-
 jobs:
   deploy:
     name: Deploy documentation
@@ -46,7 +43,7 @@ jobs:
           context: docker/
           build-args:
             ARCH=amd64/
-          tags: devopstales/trivy-operator:$VERSION-amd64
+          tags: devopstales/trivy-operator:${{github.ref_name}}-amd64
           push: true
       - name: Build arm64v8
         uses: docker/build-push-action@v2
@@ -54,5 +51,5 @@ jobs:
           context: docker/
           build-args:
             ARCH=arm64v8/
-          tags: devopstales/trivy-operator:$VERSION-arm64v8
+          tags: devopstales/trivy-operator:${{github.ref_name}}-arm64v8
           push: true
