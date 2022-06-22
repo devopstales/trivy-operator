@@ -6,7 +6,6 @@ on:
 
 env:
   VERSION = ${GITHUB_REF#refs/tags/v}
-  TRIVY   = $(shell curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d "v" -f2)
 
 jobs:
   deploy:
@@ -20,6 +19,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: true
+      - run: |
+          echo "TRIVY=$(curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d 'v' -f2)" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
