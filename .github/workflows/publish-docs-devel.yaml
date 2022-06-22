@@ -7,9 +7,6 @@ on:
 
 permissions: {}
 
-env:
-  VERSION: ${GITHUB_REF#refs/tags/v}
-
 jobs:
   deploy:
     name: Deploy documentation
@@ -35,6 +32,6 @@ jobs:
       - name: Deploy the devel documents from new tag push
         run: |
           mike deploy --push devel
-          mike deploy --push --update-aliases $VERSION latest
+          mike deploy --push --update-aliases ${{github.ref_name}} latest
           mike set-default --push latest
 # test
