@@ -16,11 +16,6 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://devopstales.github.io/trivy-operator/devel/image-validator.md/</loc>
-         <lastmod>2022-06-22</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://devopstales.github.io/trivy-operator/devel/installation/</loc>
          <lastmod>2022-06-22</lastmod>
          <changefreq>daily</changefreq>

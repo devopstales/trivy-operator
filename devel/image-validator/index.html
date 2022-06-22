@@ -63,6 +63,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#trivy-image-validator" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -274,10 +279,50 @@
       <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
       
       
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Admission Controller
+          <span class="md-nav__icon md-icon"></span>
+        </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
         Admission Controller
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#admission-controller" class="md-nav__link">
+    Admission Controller
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-deploy" class="md-nav__link">
+    Example Deploy:
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -315,6 +360,30 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#admission-controller" class="md-nav__link">
+    Admission Controller
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-deploy" class="md-nav__link">
+    Example Deploy:
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -326,15 +395,23 @@
             <article class="md-content__inner md-typeset">
               
                 
-  <a href="https://github.com/devopstales/trivy-operator/edit/master/docs/image-validator.md" title="Edit this page" class="md-content__button md-icon">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
-  </a>
 
 
-
-  <h1>Admission Controller</h1>
-
-
+<h1 id="trivy-image-validator">Trivy Image Validator</h1>
+<h2 id="admission-controller">Admission Controller</h2>
+<p>The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy if it is in a namespace with the label <code>trivy-operator-validation=true</code>.</p>
+<h2 id="example-deploy">Example Deploy:</h2>
+<p>You can define policy to the Admission Controller, by adding annotation to the pod trough the deployment:</p>
+<div class="highlight"><pre><span></span><code>spec:
+  ...
+  template:
+    metadata:
+      annotations:
+        trivy.security.devopstales.io/medium: &quot;5&quot;
+        trivy.security.devopstales.io/low: &quot;10&quot;
+        trivy.security.devopstales.io/critical: &quot;2&quot;
+...
+</code></pre></div>
 
               
             </article>
