@@ -63,7 +63,7 @@ AC_VULN = prometheus_client.Gauge(
 IN_CLUSTER = os.getenv("IN_CLUSTER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 IS_GLOBAL = os.getenv("IS_GLOBAL", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
-REDIS_ENABLED = os.getenv("REDIS_ENABLED", FalFalse) in ('true', '1', 'True', 't', 'yes', 'Yes')
+REDIS_ENABLED = os.getenv("REDIS_ENABLED", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 if REDIS_ENABLED:
     REDIS_BACKEND = os.getenv("REDIS_BACKEND")
     if not REDIS_BACKEND:
@@ -418,6 +418,8 @@ async def create_fn( logger, spec, **kwargs):
 
                 trivy_result = trivy_result_list[image_name]
                 #logger.debug(trivy_result) # debug
+                vul_report[pod_name] = []
+                policy_report[pod_name] = []
                 if trivy_result == "ERROR":
                     vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
@@ -440,7 +442,7 @@ async def create_fn( logger, spec, **kwargs):
                         "rule": item["VulnerabilityID"],
                         "properties": {
                             "registry.server": image_name.split('/')[0],
-                            "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2],
+                            "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],,
                             "artifact.tag": image_name.split(':')[-1],
                         },
                         "resources": [],
@@ -458,8 +460,8 @@ async def create_fn( logger, spec, **kwargs):
                         }
                     ]
 
-                    vul_report[pod_name] = [vuls_long]
-                    policy_report[pod_name] = [report]
+                    vul_report[pod_name] += [vuls_long]
+                    policy_report[pod_name] += [report]
                     vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
 
                     MyLogger.info(pod_name) # WARNING
@@ -525,7 +527,7 @@ async def create_fn( logger, spec, **kwargs):
                                 "rule": item["VulnerabilityID"],
                                 "properties": {
                                     "registry.server": image_name.split('/')[0],
-                                    "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2],
+                                    "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],,
                                     "artifact.tag": image_name.split(':')[-1],
                                     "resource": item["PkgName"],
                                     "score": str(score),
@@ -546,8 +548,8 @@ async def create_fn( logger, spec, **kwargs):
                                     "uid": pod_uid,
                                 }
                             ]
-                            vul_report[pod_name] = [vuls_long]
-                            policy_report[pod_name] = [report]
+                            vul_report[pod_name] += [vuls_long]
+                            policy_report[pod_name] += [report]
                         vul_list[pod_name] = [vuls, ns_name, image_name, pod_uid]
 
                         MyLogger.info(pod_name) # WARNING
@@ -576,7 +578,7 @@ async def create_fn( logger, spec, **kwargs):
                             "rule": item["VulnerabilityID"],
                             "properties": {
                                 "registry.server": image_name.split('/')[0],
-                                "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2],
+                                "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],,
                                 "artifact.tag": image_name.split(':')[-1],
                             },
                             "resources": [],
@@ -714,7 +716,8 @@ async def create_fn( logger, spec, **kwargs):
                         "warn": ( mediumCount + lowCount ),
                     },
                 }
-
+                if vuls['NONE'] > 0:
+                    policy_report[pod_name]["rule"] = ""
                 policyReport["results"] = policy_report[pod_name]
 
                 is_vulnerabilityreport_exists = get_vulnerabilityreports(namespace, vr_name)
