@@ -8,7 +8,7 @@ on:
 permissions: {}
 
 env:
-  VERSION = ${GITHUB_REF#refs/tags/v}
+  VERSION: ${GITHUB_REF#refs/tags/v}
 
 jobs:
   deploy:
