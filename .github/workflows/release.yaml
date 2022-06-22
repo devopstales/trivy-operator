@@ -29,8 +29,8 @@ jobs:
       - name: Prepare
         id: prep
         run: |
-          VERSION = ${GITHUB_REF#refs/tags/v}
-          TRIVY   = $(shell curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d "v" -f2)
+          export VERSION = ${GITHUB_REF#refs/tags/v}
+          export TRIVY   = $(shell curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d "v" -f2)
           wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v$(TRIVY)/trivy_"$(TRIVY)"_Linux-64bit.tar.gz
           tar -C /tmp -xf /tmp/trivy.tar.gz
           # copy files

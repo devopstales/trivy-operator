@@ -31,7 +31,7 @@ jobs:
           git config user.email "devopstales-bot@users.noreply.github.com"
       - name: Deploy the devel documents from new tag push
         run: |
-          VERSION = ${GITHUB_REF#refs/tags/v}
+          export VERSION = ${GITHUB_REF#refs/tags/v}
           mike deploy --push devel
           mike deploy --push --update-aliases $VERSION latest
           mike set-default --push latest
