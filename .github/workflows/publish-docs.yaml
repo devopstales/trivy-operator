@@ -14,7 +14,7 @@ permissions: {}
 
 jobs:
   deploy:
-    name: Deploy documentation
+    name: Build And Release
     runs-on: ubuntu-20.04
     permissions:
       contents: write
