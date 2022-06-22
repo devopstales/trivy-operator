@@ -4,6 +4,7 @@ site_url: https://devopstales.github.io/trivy-operator/
 docs_dir: docs/
 repo_name: GitHub
 repo_url: https://github.com/devopstales/trivy-operator
+edit_uri: ""
 
 nav:
     - Overview: index.md
