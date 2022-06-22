@@ -1,0 +1,37 @@
+name: Publish documentation
+
+on:
+  push:
+    tags:
+      - "v*devel"
+
+permissions: {}
+
+jobs:
+  deploy:
+    name: Deploy documentation
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+      - name: Install dependencies
+        run: |
+          pip install -r docs/build/requirements.txt
+      - name: Configure the git user
+        run: |
+          git config user.name "devopstales-bot"
+          git config user.email "devopstales-bot@users.noreply.github.com"
+      - name: Deploy the devel documents from new tag push
+        run: |
+          VERSION = ${GITHUB_REF#refs/tags/v}
+          mike deploy --push devel
+          mike deploy --push --update-aliases $VERSION latest
+          mike set-default --push latest
