@@ -13,7 +13,7 @@ RUN apk -U upgrade && \
 RUN pip3 install --no-cache-dir kopf[dev] kubernetes asyncio pycron prometheus_client oscrypto certvalidator certbuilder validators pyOpenSSL
 
 COPY trivy-operator.py /trivy-operator.py
-COPY trivy /usr/local/bin
+COPY ${ARCH}/trivy /usr/local/bin/
 
 RUN addgroup -S -g 10001 trivy-operator && \
     adduser -S -u 10001 trivy-operator -G trivy-operator && \
