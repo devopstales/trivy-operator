@@ -1,6 +1,6 @@
 ARG ARCH
 FROM ${ARCH}python:3.8-alpine
-
+ARG ARCH
 ENV TRIVY_CACHE_DIR=/home/trivy-operator/trivy-cache \
     TRIVY_QUIET=true \
     IN_CLUSTER=true
@@ -13,7 +13,7 @@ RUN apk -U upgrade && \
 RUN pip3 install --no-cache-dir kopf[dev] kubernetes asyncio pycron prometheus_client oscrypto certvalidator certbuilder validators pyOpenSSL
 
 COPY trivy-operator.py /trivy-operator.py
-COPY ${ARCH}/trivy /usr/local/bin/
+COPY ${ARCH}trivy /usr/local/bin/
 
 RUN addgroup -S -g 10001 trivy-operator && \
     adduser -S -u 10001 trivy-operator -G trivy-operator && \
