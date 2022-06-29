@@ -35,7 +35,7 @@ jobs:
           wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v${{env.TRIVY}}/trivy_${{env.TRIVY}}_Linux-64bit.tar.gz
           tar -C /tmp -xf /tmp/trivy.tar.gz
           mkdir docker/amd64
-          cp /tmp/trivy docker/arm64v8/trivy
+          cp /tmp/trivy docker/amd64/trivy
           cp trivy-operator.py docker/trivy-operator.py
           rm -f /tmp/trivy.tar.gz /tmp/trivy
           # arm64v8
