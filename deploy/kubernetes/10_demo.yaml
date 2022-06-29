@@ -15,26 +15,15 @@ metadata:
 spec:
   initContainers:
   - name: init
-    image: nginxinc/nginx-unprivileged:latest
+    image: alpine:latest
     command: ['sh', '-c', 'echo The app is running! && sleep 10']
   - name: init2
-    image: nginxinc/nginx-unprivileged:latest
+    image: ubuntu:latest
     command: ['sh', '-c', 'echo The app is running! && sleep 10']
   containers:
-  - image: nginx:1.18
+  - image: library/nginx:latest
     imagePullPolicy: IfNotPresent
     name: nginx
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: nginx2
-  namespace: trivytest
-spec:
-  containers:
-  - image: nginx
+  - image: library/nginx:bad
     imagePullPolicy: IfNotPresent
     name: nginx
-  - image: nginx
-    imagePullPolicy: IfNotPresent
-    name: nginx2

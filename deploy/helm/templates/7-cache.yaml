@@ -1,0 +1,66 @@
+{{- if .Values.cache.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "trivy-operator.fullname" . }}-cache
+  labels:
+    app: trivy-cache
+    {{- include "trivy-operator.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: trivy-cache
+  template:
+    metadata:
+      labels:
+        app: trivy-cache
+    spec:
+      securityContext:
+          fsGroup: 10001
+          fsGroupChangePolicy: "OnRootMismatch"
+      serviceAccountName: trivy-operator
+      containers:
+      - image: redis:latest
+        name: redis
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: cache
+          mountPath: "/data"
+        ports:
+          - containerPort: 6379
+      volumes:
+      - name: cache
+        persistentVolumeClaim:
+            claimName: "{{ include "trivy-operator.fullname" . }}-cache"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "trivy-operator.fullname" . }}-cache
+  labels:
+    app: trivy-cache
+    {{- include "trivy-operator.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "trivy-operator.fullname" . }}-cache
+  labels:
+    app: trivy-cache
+    {{- include "trivy-operator.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: trivy-cache
+  ports:
+    - name: cache
+      protocol: TCP
+      port: 6379
+      targetPort: 6379
+{{- end }}

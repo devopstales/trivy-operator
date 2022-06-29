@@ -1,0 +1,92 @@
+{{- if .Values.serviceAccount.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "trivy-operator.serviceAccountName" . }}
+rules:
+- apiGroups:
+    - "apiextensions.k8s.io"
+  resources:
+    - customresourcedefinitions
+  verbs:
+    - create
+- apiGroups:
+   - "wgpolicyk8s.io"
+  resources:
+  - policyreports
+  verbs:
+    - get
+    - create
+    - delete
+- apiGroups:
+   - "trivy-operator.devopstales.io"
+  resources:
+  - vulnerabilityreports
+  verbs:
+    - get
+    - create
+    - delete
+- apiGroups:
+   - "trivy-operator.devopstales.io"
+  resources:
+  - namespace-scanners
+  - namespace-scanners/status
+  verbs:
+  - get
+  - watch
+  - list
+  - patch
+- apiGroups:
+   - ""
+  resources:
+  - events
+  verbs:
+  - get
+  - create
+  - patch
+- apiGroups:
+   - ""
+  resources:
+  - pods
+  - namespaces
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - "admissionregistration.k8s.io"
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - create
+  - patch
+  - get
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "trivy-operator.serviceAccountName" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "trivy-operator.serviceAccountName" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "trivy-operator.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "trivy-operator.serviceAccountName" . }}
+  labels:
+    app: trivy-operator
+    {{- include "trivy-operator.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

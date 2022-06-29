@@ -1,0 +1,41 @@
+site_name: trivy-operator
+site_description: Kubernetes Operator based on the open-source container vulnerability scanner Trivy.
+site_url: https://devopstales.github.io/trivy-operator/
+docs_dir: docs/
+repo_name: GitHub
+repo_url: https://github.com/devopstales/trivy-operator
+edit_uri: ""
+
+nav:
+    - Overview: index.md
+    - Installation: installation.md
+    - Quick Start: quickstart.md
+    - Configuration: configuration.md
+    - Admission Controller: image-validator.md
+    - Monitoring: monitoring.md
+
+
+theme:
+  name: material
+  language: "en"
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - admonition
+  - footnotes
+  - attr_list
+  - pymdownx.tabbed
+  - def_list
+  - pymdownx.details
+
+extra:
+  generator: false
+  version:
+    default: latest
+    method: mike
+    provider: mike
+
+plugins:
+  - search
+  - macros

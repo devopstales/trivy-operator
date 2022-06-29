@@ -20,13 +20,15 @@ spec:
           fsGroup: 10001
           fsGroupChangePolicy: "OnRootMismatch"
       serviceAccountName: trivy-operator
-#      imagePullSecrets:
-#      - name: regcred
       containers:
-      - image: devopstales/trivy-operator:1.0
+      - image: devopstales/trivy-operator:2.3
+        imagePullPolicy: IfNotPresent
         name: trivy-operator
-        imagePullPolicy: Always
-#        env:
+        env:
+        - name: REDIS_ENABLED
+          value: "True"
+        - name: REDIS_BACKEND
+          value: "redis://trivy-cache:6379"
 #        - name: GITHUB_TOKEN
 #          value: MY-TOKEN-FROM-GITHUB
         volumeMounts:

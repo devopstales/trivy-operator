@@ -1,0 +1,22 @@
+{{- if .Values.serviceMonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    serviceapp: {{ include "trivy-operator.fullname" . }}-trivy-operator
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  name: {{ include "trivy-operator.fullname" . }}-trivy-operator
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+  - interval: 60s
+    path: /
+    scrapeTimeout: 30s
+    targetPort: 9115
+  selector:
+    matchLabels:
+      app: trivy-operator
+      service: metrics
+{{- end }}
