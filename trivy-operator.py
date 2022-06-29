@@ -439,14 +439,13 @@ async def create_fn( logger, spec, **kwargs):
                         "category": "Vulnerability Scan",
                         "message": "Image Scanning Error",
                         "policy": "Image Vulnerability",
-                        "rule": item["VulnerabilityID"],
+                        "rule": "",
                         "properties": {
                             "registry.server": image_name.split('/')[0],
                             "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],
                             "artifact.tag": image_name.split(':')[-1],
                         },
                         "resources": [],
-                        "severity": "error",
                         "result": "error",
                         "source": "Trivy Vulnerability"
                     }
@@ -717,7 +716,7 @@ async def create_fn( logger, spec, **kwargs):
                     },
                 }
                 if vuls['NONE'] > 0:
-                    policy_report[pod_name]["rule"] = ""
+                    policy_report[pod_name][0]["rule"] = ""
                 policyReport["results"] = policy_report[pod_name]
 
                 is_vulnerabilityreport_exists = get_vulnerabilityreports(namespace, vr_name)

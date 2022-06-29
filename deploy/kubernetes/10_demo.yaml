@@ -24,3 +24,6 @@ spec:
   - image: library/nginx:latest
     imagePullPolicy: IfNotPresent
     name: nginx
+  - image: library/nginx:bad
+    imagePullPolicy: IfNotPresent
+    name: nginx
