@@ -32,14 +32,14 @@ jobs:
         id: prep
         run: |
           # amd64
-          wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v$TRIVY/trivy_"$TRIVY"_Linux-64bit.tar.gz
+          wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v${{env.TRIVY}}/trivy_${{env.TRIVY}}_Linux-64bit.tar.gz
           tar -C /tmp -xf /tmp/trivy.tar.gz
           mkdir docker/amd64
           cp /tmp/trivy docker/arm64v8/trivy
           cp trivy-operator.py docker/trivy-operator.py
           rm -f /tmp/trivy.tar.gz /tmp/trivy
           # arm64v8
-          wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v$TRIVY/trivy_"$TRIVY"_Linux-ARM64.tar.gz
+          wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v${{env.TRIVY}}/trivy_${{env.TRIVY}}_Linux-ARM64.tar.gz
           tar -C /tmp -xf /tmp/trivy.tar.gz
           mkdir docker/arm64v8
           cp /tmp/trivy docker/arm64v8/trivy
