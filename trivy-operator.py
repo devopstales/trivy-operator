@@ -17,6 +17,7 @@ from datetime import datetime
 from OpenSSL import crypto
 from datetime import datetime, timezone
 import logging
+import uuid
 
 #############################################################################
 # Logging
@@ -443,6 +444,7 @@ async def create_fn( logger, spec, **kwargs):
                         "properties": {
                             "artifact.repository": image_name.split(':')[0],
                             "artifact.tag": image_name.split(':')[1],
+                            "resultID": str(uuid.uuid4()),
                         },
                         "resources": [],
                         "result": "error",
@@ -524,12 +526,14 @@ async def create_fn( logger, spec, **kwargs):
                                 "policy": "Image Vulnerability",
                                 "rule": item["VulnerabilityID"],
                                 "properties": {
-                                    "artifact.repository": image_name.split(':')[0],
-                                    "artifact.tag": image_name.split(':')[1],
+                                    "registry.server": image_name.split('/')[0],
+                                    "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],
+                                    "artifact.tag": image_name.split(':')[-1],
                                     "resource": item["PkgName"],
                                     "score": str(score),
                                     "primaryLink": item["PrimaryURL"],
                                     "installedVersion": item["InstalledVersion"],
+                                    "resultID": str(uuid.uuid4()),
                                 },
                                 "resources": [],
                                 "severity": item["Severity"].lower(),
@@ -574,8 +578,10 @@ async def create_fn( logger, spec, **kwargs):
                             "policy": "Image Vulnerability",
                             "rule": item["VulnerabilityID"],
                             "properties": {
-                                "artifact.repository": image_name.split(':')[0],
+                                "registry.server": image_name.split('/')[0],
+                                "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],
                                 "artifact.tag": image_name.split(':')[1],
+                                "resultID": str(uuid.uuid4()),
                             },
                             "resources": [],
                             "result": "pass",
@@ -1038,7 +1044,7 @@ if AC_ENABLED:
                 elif b"unsupported MediaType" in error.strip():
                     logger.error(
                         "Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
-                elif b"MANIFEST_UNKNOWN: manifest unknown; map[Tag:latest]" in error.strip():
+                elif b"MANIFEST_UNKNOWN: manifest unknown" in error.strip():
                     logger.error("No tag in registry")
                 else:
                     logger.error("%s" % (error.strip()))
