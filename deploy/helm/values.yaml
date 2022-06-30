@@ -4,6 +4,7 @@ image:
   tag: "2.4"
 
 log_level: "INFO"
+# INFO, HIGH, DEBUG
 
 imagePullSecrets: []
 podSecurityContext:

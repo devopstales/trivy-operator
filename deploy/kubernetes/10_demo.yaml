@@ -26,4 +26,4 @@ spec:
     name: nginx
   - image: library/nginx:bad
     imagePullPolicy: IfNotPresent
-    name: nginx
+    name: nginx-bad
