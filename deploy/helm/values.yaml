@@ -1,7 +1,7 @@
 image:
   repository: devopstales/trivy-operator
   pullPolicy: Always
-  tag: "2.3"
+  tag: "2.4"
 
 log_level: "INFO"
 
