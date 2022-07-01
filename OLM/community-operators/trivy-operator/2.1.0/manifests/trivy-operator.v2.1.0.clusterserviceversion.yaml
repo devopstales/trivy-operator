@@ -153,7 +153,7 @@ spec:
   maintainers:
   - email: devopstales@protonmail.com
     name: devopstales
-  maturity: alpha
+  maturity: stable
   provider:
     name: devopstales
     url: devopstales.github.io
@@ -176,7 +176,7 @@ spec:
             - "apiextensions.k8s.io"
           resources:
             - "customresourcedefinitions"
-          verbs:
+          verbs: 
             - "create"
         - apiGroups:
           - "trivy-operator.devopstales.io"
