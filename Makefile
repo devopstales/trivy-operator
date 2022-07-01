@@ -7,13 +7,14 @@ all:	 trivy
 .DEFAULT_GOAL := help
 
 TRIVY := $(shell curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d "v" -f2)
+BENCH := $(shell curl --silent https://api.github.com/repos/aquasecurity/kube-bench/releases/latest | jq -r .name | cut -d "v" -f2)
 
 #help:	@ List available tasks on this project
 help:
 	@grep -E '[a-zA-Z\.\-]+:.*?@ .*$$' $(MAKEFILE_LIST)| tr -d '#'  | awk 'BEGIN {FS = ":.*?@ "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-#trivy:	@ download trivy binary
-trivy:
+#trivy:	@ download binaries
+bins:
 	@if [ ! -f /tmp/trivy ]; then \
 		echo "Get Trivy Version:"; \
 		echo $(TRIVY); \
@@ -21,8 +22,15 @@ trivy:
 		echo "Extract Trivy"; \
 		tar -C /tmp -xf /tmp/trivy.tar.gz; \
 	fi
-	rm -f docker/trivy
+	@if [ ! -f /tmp/kube-bench ]; then \
+		echo "Get kube-bench Version"; \
+		echo $(BENCH); \
+		wget -q -O /tmp/kube-bench.tar.gz https://github.com/aquasecurity/kube-bench/releases/download/v$(BENCH)/kube-bench_"$(BENCH)"_linux_amd64.tar.gz; \
+		tar -C /tmp -xf /tmp/kube-bench.tar.gz; \
+	fi
+	rm -f docker/trivy docker/kube-bench
 	cp /tmp/trivy docker/trivy
+	cp /tmp/kube-bench docker/kube-bench
 
 #devel:	@ Build local devel image with kim
 devel:

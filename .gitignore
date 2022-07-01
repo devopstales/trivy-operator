@@ -1,6 +1,7 @@
 # Customize
 docker/*.py
 docker/trivy
+docker/kube-bench
 old/
 note.md
 test*
