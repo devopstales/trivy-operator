@@ -8,12 +8,18 @@ ENV TRIVY_CACHE_DIR=/home/trivy-operator/trivy-cache \
 COPY entrypoint.sh /entrypoint.sh
 
 RUN apk -U upgrade && \
-    apk add --no-cache gcc musl-dev libffi-dev openssl-dev curl bash rust cargo
+    apk add --no-cache gcc musl-dev libffi-dev openssl-dev curl bash rust cargo procps apk-tools
+
+RUN wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.33-r0/glibc-2.33-r0.apk && \
+    apk add glibc-2.33-r0.apk && \
+    mkdir /etc/kube-bench
 
 RUN pip3 install --no-cache-dir kopf[dev] kubernetes asyncio pycron prometheus_client oscrypto certvalidator certbuilder validators pyOpenSSL
 
 COPY trivy-operator.py /trivy-operator.py
 COPY ${ARCH}trivy /usr/local/bin/
+ADD ${ARCH}cfg /etc/kube-bench/cfg
+COPY ${ARCH}kube-bench /usr/local/bin/
 
 RUN addgroup -S -g 10001 trivy-operator && \
     adduser -S -u 10001 trivy-operator -G trivy-operator && \
