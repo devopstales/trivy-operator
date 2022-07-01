@@ -19,6 +19,14 @@ rules:
     - create
     - delete
 - apiGroups:
+   - "wgpolicyk8s.io"
+  resources:
+  - clusterpolicyreports
+  verbs:
+    - get
+    - create
+    - delete
+- apiGroups:
    - "trivy-operator.devopstales.io"
   resources:
   - vulnerabilityreports
