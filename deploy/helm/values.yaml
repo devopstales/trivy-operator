@@ -51,11 +51,11 @@ admissionController:
   enabled: false
 
 registryAuth:
-  enabled: false
-  registry:
-  - name: docker.io
-    user: "user"
-    password: "password"
+  enabled: true
+  image_pull_secrets:
+    - regcrd
+## list containing the names of the image pull secrets 
+## you want to use from the operator namespace for image pulls
 
 githubToken:
   enabled: false
