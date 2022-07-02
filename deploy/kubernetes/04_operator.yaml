@@ -25,6 +25,10 @@ spec:
         imagePullPolicy: IfNotPresent
         name: trivy-operator
         env:
+        - name: MY_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         - name: REDIS_ENABLED
           value: "True"
         - name: REDIS_BACKEND

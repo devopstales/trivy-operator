@@ -108,6 +108,13 @@ async def startup_fn_prometheus_client(logger, **kwargs):
 async def create_fn( logger, spec, **kwargs):
     logger.info("NamespaceScanner Created")
 
+    if IN_CLUSTER:
+        k8s_config.load_incluster_config()
+    else:
+        k8s_config.load_kube_config()
+
+    v1 = k8s_client.CoreV1Api()
+
     try:
         crontab = spec['crontab']
         logger.debug("namespace-scanners - crontab:") # debuglog
@@ -122,7 +129,7 @@ async def create_fn( logger, spec, **kwargs):
         logger.debug("namespace-scanners - clusterWide:") # debuglog
         logger.debug(format(clusterWide)) # debuglog
     except:
-        logger.info("clusterWide is not set, checking namespaceSelector")
+        logger.warning("clusterWide is not set, checking namespaceSelector")
         clusterWide = False
 
     namespaceSelector = None
@@ -131,7 +138,28 @@ async def create_fn( logger, spec, **kwargs):
         logger.debug("namespace-scanners - namespace_selector:") # debuglog
         logger.debug(format(namespaceSelector)) # debuglog
     except:
-        logger.info("namespace_selector is not set")
+        logger.warning("namespace_selector is not set")
+
+    registry_list = []
+    secret_names = None
+    current_namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+    try:
+        secret_names = spec['image_pull_secrets']
+        secret_names_present = True
+        logger.debug("image_pull_secrets:") # debuglog
+    except:
+        secret_names_present = False
+        logger.warning("image_pull_secrets is not set")
+    if secret_names_present:
+        for secret_name in secret_names:
+            try:
+                secret = v1.read_namespaced_secret(secret_name, current_namespace)
+                secret_data = secret.data['.dockerconfigjson']
+                data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
+                registry_list.append(data['auths'])
+                logger.debug(format(data['auths'])) # debuglog
+            except:
+                logger.error("%s secret dose not exist in namespace %s" % (secret_name, current_namespace))
 
     if clusterWide == False and namespaceSelector is None:
         logger.error("Either clusterWide need to be set to 'true' or namespace_selector should be set")
@@ -245,11 +273,6 @@ async def create_fn( logger, spec, **kwargs):
         except ApiException as e:
             print("Exception when deleting policyReport - %s : %s\n" % (name, e))
 
-    if IN_CLUSTER:
-        k8s_config.load_incluster_config()
-    else:
-        k8s_config.load_kube_config()
-
     ############################################
     # start crontab
     ############################################
@@ -355,22 +378,17 @@ async def create_fn( logger, spec, **kwargs):
                 logger.info("Scanning Image: %s" % (image_name))
 
                 registry = image_name.split('/')[0]
-                try:
-                    registry_list = spec['registry']
-
-                    for reg in registry_list:
-                        if reg['name'] == registry:
-                            os.environ['DOCKER_REGISTRY'] = reg['name']
-                            os.environ['TRIVY_USERNAME'] = reg['user']
-                            os.environ['TRIVY_PASSWORD'] = reg['password']
-                        elif not validators.domain(registry):
-                            """If registry is not an url"""
-                            if reg['name'] == "docker.io":
-                                os.environ['DOCKER_REGISTRY'] = reg['name']
-                                os.environ['TRIVY_USERNAME'] = reg['user']
-                                os.environ['TRIVY_PASSWORD'] = reg['password']
-                except:
-                    logger.debug("No registry auth config is defined.") # debug
+                for reg in registry_list:
+                    if  reg.get(registry):
+                        os.environ['DOCKER_REGISTRY'] = registry
+                        os.environ['TRIVY_USERNAME'] = reg[registry]['username']
+                        os.environ['TRIVY_PASSWORD'] = reg[registry]['password']
+                    elif not validators.domain(registry):
+                        """If registry is not an url"""
+                        if reg.get("docker.io"):
+                            os.environ['DOCKER_REGISTRY'] = "docker.io"
+                            os.environ['TRIVY_USERNAME'] = reg['docker.io']['username']
+                            os.environ['TRIVY_PASSWORD'] = reg['docker.io']['password']
                     ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
                     logger.info("Active Registry: %s" % (ACTIVE_REGISTRY))
 

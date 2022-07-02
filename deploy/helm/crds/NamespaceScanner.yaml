@@ -41,6 +41,10 @@ spec:
             type: string
           clusterWide:
             type: string
+          image_pull_secrets:
+            type: array
+            items:
+              type: string
           spec:
             type: object
             x-kubernetes-preserve-unknown-fields: true

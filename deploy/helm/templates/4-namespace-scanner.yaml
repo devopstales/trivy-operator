@@ -10,8 +10,8 @@ spec:
   namespace_selector: "{{ .Values.namespaceScanner.namespaceSelector }}"
   clusterWide: {{ .Values.namespaceScanner.clusterWide | default "false" }}
   {{- if .Values.registryAuth.enabled }}
-  {{- with .Values.registryAuth.registry }}
-  registry:
+  {{- with .Values.registryAuth.image_pull_secrets }}
+  image_pull_secrets:
   {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- end }}
