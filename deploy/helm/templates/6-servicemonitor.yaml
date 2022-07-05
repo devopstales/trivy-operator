@@ -8,15 +8,27 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
   name: {{ include "trivy-operator.fullname" . }}-trivy-operator
+  {{ if .Values.serviceMonitor.namespace }}
+  namespace: {{ .Values.serviceMonitor.namespace }}
+  {{ else }}
   namespace: {{ .Release.Namespace }}
+  {{ end }}
 spec:
+  selector:
+    matchLabels:
+      app: trivy-operator
+      service: metrics
   endpoints:
   - interval: 60s
     path: /
     scrapeTimeout: 30s
     targetPort: 9115
-  selector:
-    matchLabels:
-      app: trivy-operator
-      service: metrics
+    {{- with .Values.serviceMonitor.relabelings }}
+    relabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
 {{- end }}
