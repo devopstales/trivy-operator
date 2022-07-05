@@ -20,6 +20,15 @@ import logging
 import uuid
 
 #############################################################################
+# ToDo
+#############################################################################
+# Operator
+## Get pull secret from Pod ref
+## Get pull secret from ServiceAccount ref
+## Add kube-bech as scanner
+## Add kube-hunter as scanner
+## Integration with OWASP Defectdojo
+#############################################################################
 # Logging
 #############################################################################
 
