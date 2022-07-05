@@ -24,9 +24,30 @@ monitoring:
 
 serviceMonitor:
   enabled: false
-  namespace: "kube-system"
+  # allow to override the namespace for serviceMonitor
+  namespace:
+  # labels to match the serviceMonitorSelector of the Prometheus Resource
   labels:
     release: prometheus
+  # https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#relabelconfig
+  relabelings: []
+  # see serviceMonitor.relabelings
+  metricRelabelings: []
+
+grafana:
+  # namespace for configMap of grafana dashboards
+  namespace:
+  dashboards:
+    # Enable the deployment of grafana dashboards
+    enabled: true
+    # Label to find dashboards using the k8s sidecar
+    label: grafana_dashboard
+    value: "1"
+  folder:
+    # Annotation to enable folder storage using the k8s sidecar
+    annotation: grafana_folder
+    # Grafana folder in which to store the dashboards
+    name: Policy Reporter
 
 persistence:
   enabled: true
