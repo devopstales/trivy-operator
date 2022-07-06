@@ -502,13 +502,20 @@ async def create_fn( logger, spec, **kwargs):
                                 pLink = item["PrimaryURL"]
                             except:
                                 pLink = ""
+                            try:
+                                refLink =  item["References"]
+                            except:
+                                refLink = []
 
                             if "CRITICAL" or "HIGH" in item["Severity"]:
                                 result = "fail"
-                            elif "MEDIUM" or "LOW" in item["Severity"]:
+                                severity = item["Severity"]
+                            if "MEDIUM" or "LOW" in item["Severity"]:
                                 result = "warn"
-                            elif "UNKNOWN" in item["Severity"]:
+                                severity = item["Severity"]
+                            if "UNKNOWN" in item["Severity"]:
                                 result = "skip"
+                                severity = "INFO"
 
                             vuls_long = {
                                 "vulnerabilityID": item["VulnerabilityID"],
@@ -517,7 +524,7 @@ async def create_fn( logger, spec, **kwargs):
                                 "primaryLink": pLink,
                                 "severity": item["Severity"],
                                 "score": score,
-                                "links": item["References"],
+                                "links": refLink,
                                 "title": title,
                             }
                             report = {
@@ -531,12 +538,12 @@ async def create_fn( logger, spec, **kwargs):
                                     "artifact.tag": image_name.split(':')[-1],
                                     "resource": item["PkgName"],
                                     "score": str(score),
-                                    "primaryLink": item["PrimaryURL"],
+                                    "primaryLink": pLink,
                                     "installedVersion": item["InstalledVersion"],
                                     "resultID": str(uuid.uuid4()),
                                 },
                                 "resources": [],
-                                "severity": item["Severity"].lower(),
+                                "severity": severity.lower(),
                                 "result": result,
                                 "source": "Trivy Vulnerability"
                             }
