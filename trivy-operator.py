@@ -159,16 +159,21 @@ async def create_fn( logger, spec, **kwargs):
     except:
         secret_names_present = False
         logger.warning("image_pull_secrets is not set")
-    if secret_names_present:
+
+    """Get auth data from pull secret"""
+    def pull_secret_decoder(secret_names, secret_namespace):
         for secret_name in secret_names:
             try:
-                secret = v1.read_namespaced_secret(secret_name, current_namespace)
+                secret = v1.read_namespaced_secret(secret_name, secret_namespace)
                 secret_data = secret.data['.dockerconfigjson']
                 data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
                 registry_list.append(data['auths'])
                 logger.debug(format(data['auths'])) # debuglog
             except:
-                logger.error("%s secret dose not exist in namespace %s" % (secret_name, current_namespace))
+                logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
+
+    if secret_names_present:
+        pull_secret_decoder(secret_names, current_namespace)
 
     if clusterWide == False and namespaceSelector is None:
         logger.error("Either clusterWide need to be set to 'true' or namespace_selector should be set")
@@ -326,6 +331,13 @@ async def create_fn( logger, spec, **kwargs):
                 """Find images in pods"""
                 for pod in namespaced_pod_list.items:
                     containers = pod.status.container_statuses
+                    if pod.spec.image_pull_secrets is not None:
+                        for item in pod.spec.image_pull_secrets:
+                            tmp = str(item)
+                            tmp = tmp.replace("\'", "\"")
+                            tmp2 = json.loads(tmp)
+                            tmp3 = [tmp2.get('name')]
+                            pull_secret_decoder(tmp3, tagged_ns)
                     try:
                         for image in containers:
                             pod_name = pod.metadata.name
