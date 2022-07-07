@@ -428,20 +428,36 @@ async def create_fn( logger, spec, **kwargs):
                     if b"401" in error.strip():
                         logger.error(
                             "Repository: Unauthorized authentication required")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "Repository authentication required"
+                        }
                     elif b"UNAUTHORIZED" in error.strip():
                         logger.error(
                             "Repository: Unauthorized authentication required")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "Repository authentication required"
+                        }
                     elif b"You have reached your pull rate limit." in error.strip():
                         logger.error("You have reached your pull rate limit.")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "You have reached your pull rate limit"
+                        }
                     elif b"unsupported MediaType" in error.strip():
                         logger.error(
                             "Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "Unsupported MediaType"
+                        }
                     elif b"MANIFEST_UNKNOWN: manifest unknown; map[Tag:latest]" in error.strip():
                         logger.error("No tag in registry")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "No tag in registry"
+                        }
                     else:
                         logger.error("%s" % (error.strip()))
-                    """Error action"""
-                    trivy_result_list[image_name] = "ERROR"
+                        trivy_result_list[image_name] = {
+                            "ERROR": "No tag in registry"
+                        }
                 elif output:
                     trivy_result = json.loads(output.decode("UTF-8"))
                     trivy_result_list[image_name] = trivy_result
@@ -455,11 +471,10 @@ async def create_fn( logger, spec, **kwargs):
                 pod_uid = pod_list[pod_name][3]
                 logger.debug("Assigning scanning result for Pod: %s - %s" % (pod_name, image_name)) # debuglog
 
-                trivy_result = trivy_result_list[image_name]
                 #logger.debug(trivy_result) # debug
                 vul_report[pod_name] = []
                 policy_report[pod_name] = []
-                if trivy_result == "ERROR":
+                if list(trivy_result.keys())[0] == "ERROR":
                     vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
                                 "CRITICAL": 0, "ERROR": 1,
@@ -474,9 +489,10 @@ async def create_fn( logger, spec, **kwargs):
                         "title": "Image Scanning Error",
                         "vulnerabilityID": ""
                     }
+                    report_message = "Image Scanning Error: " + str(list(trivy_result.values())[0])
                     report = {
                         "category": "Vulnerability Scan",
-                        "message": "Image Scanning Error",
+                        "message": report_message,
                         "policy": "Image Vulnerability",
                         "rule": "",
                         "properties": {
