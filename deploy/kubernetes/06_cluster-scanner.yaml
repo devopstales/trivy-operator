@@ -1,0 +1,6 @@
+apiVersion: trivy-operator.devopstales.io/v1
+kind: ClusterScanner
+metadata:
+  name: main-config
+spec:
+  crontab: "*/5 * * * *"

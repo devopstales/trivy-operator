@@ -3,9 +3,8 @@ kind: NamespaceScanner
 metadata:
   name: main-config
 spec:
-  crontab: "*/5 * * * *"
+  crontab: "*/1 * * * *"
   namespace_selector: "trivy-scan"
-#  registry:
-#  - name: docker.io
-#    user: "user"
-#    password: "password"
+  image_pull_secrets:
+    - devopstales-dockerhub
+#    - shiwaforce-int
