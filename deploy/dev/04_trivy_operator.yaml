@@ -16,12 +16,14 @@ spec:
         prometheus.io/port: "9115"
         prometheus.io/scrape: "true"
     spec:
+      nodeSelector:
+        node-role.kubernetes.io/builder: "true"
       securityContext:
           fsGroup: 10001
           fsGroupChangePolicy: "OnRootMismatch"
       serviceAccountName: trivy-operator
       containers:
-      - image: devopstales/trivy-operator:2.3
+      - image: devopstales/trivy-operator:2.5-devel
         imagePullPolicy: IfNotPresent
         name: trivy-operator
         env:
