@@ -417,6 +417,20 @@ async def create_fn( logger, spec, **kwargs):
                 pod_uid = pod_list[pod_name][3]
                 logger.debug("Assigning scanning result for Pod: %s - %s" % (pod_name, image_name)) # debuglog
 
+                try:
+                    if validators.domain(image_name.split('/')[0]):
+                        docker_registry = image_name.split('/')[0]
+                    else:
+                        docker_registry = "docker.io"
+                except:
+                    docker_registry = "docker.io"
+                try:
+                    docker_image_part = image_name.split('/', 1)[1]
+                    docker_image = docker_image_part.split(':')[0]
+                except: 
+                    docker_image = docker_image_part.split(':')[0]
+                docker_tag = image_name.split(':')[-1]
+
                 trivy_result = trivy_result_list[image_name]
                 #logger.debug(trivy_result) # debug
                 vul_report[pod_name] = []
@@ -442,8 +456,9 @@ async def create_fn( logger, spec, **kwargs):
                         "policy": "Image Vulnerability",
                         "rule": "",
                         "properties": {
-                            "artifact.repository": image_name.split(':')[0],
-                            "artifact.tag": image_name.split(':')[1],
+                            "registry.server": docker_registry,
+                            "artifact.repository": docker_image,
+                            "artifact.tag": docker_tag,
                             "resultID": str(uuid.uuid4()),
                         },
                         "resources": [],
@@ -533,9 +548,9 @@ async def create_fn( logger, spec, **kwargs):
                                 "policy": "Image Vulnerability",
                                 "rule": item["VulnerabilityID"],
                                 "properties": {
-                                    "registry.server": image_name.split('/')[0],
-                                    "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],
-                                    "artifact.tag": image_name.split(':')[-1],
+                                    "registry.server": docker_registry,
+                                    "artifact.repository": docker_image,
+                                    "artifact.tag": docker_tag,
                                     "resource": item["PkgName"],
                                     "score": str(score),
                                     "primaryLink": pLink,
@@ -585,9 +600,9 @@ async def create_fn( logger, spec, **kwargs):
                             "policy": "Image Vulnerability",
                             "rule": item["VulnerabilityID"],
                             "properties": {
-                                "registry.server": image_name.split('/')[0],
-                                "artifact.repository": image_name.split('/')[1] + "/" + image_name.split('/')[2].split(':')[0],
-                                "artifact.tag": image_name.split(':')[1],
+                                "registry.server": docker_registry,
+                                "artifact.repository": docker_image,
+                                "artifact.tag": docker_tag,
                                 "resultID": str(uuid.uuid4()),
                             },
                             "resources": [],
