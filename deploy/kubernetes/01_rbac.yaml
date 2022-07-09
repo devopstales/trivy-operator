@@ -43,6 +43,8 @@ rules:
   resources:
   - namespace-scanners
   - namespace-scanners/status
+  - cluster-scanners
+  - cluster-scanners/status
   verbs:
   - get
   - watch

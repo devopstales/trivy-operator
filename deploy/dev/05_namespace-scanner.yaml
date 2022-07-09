@@ -7,4 +7,3 @@ spec:
   namespace_selector: "trivy-scan"
   image_pull_secrets:
     - devopstales-dockerhub
-#    - shiwaforce-int
