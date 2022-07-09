@@ -77,9 +77,9 @@ async def startup_sc( logger, spec, **kwargs):
         logger.info("ClustereScannerProfile is not configured")
 
     if scan_profile is not None:
-        KUBE_BENCH_COMMAND = [ "kube-bench", "run", "--benchmark", scan_profile, "--json" ]
+        KUBE_BENCH_COMMAND = [ "kube-bench", "--benchmark", scan_profile, "--json" ]
     else:
-        KUBE_BENCH_COMMAND = [ "kube-bench", "run", "--json" ]
+        KUBE_BENCH_COMMAND = [ "kube-bench", "--json" ]
 
 # -s [master node controlplane etcd policies]
 # --benchmark [ack-1.0 aks-1.0 cis-1.20 cis-1.23 cis-1.5 cis-1.6 eks-1.0.1 gke-1.0 gke-1.2.0 rh-0.7 rh-1.0]
@@ -148,7 +148,8 @@ async def startup_sc( logger, spec, **kwargs):
             output, error = res.communicate()
 
             if error:
-                print(error)
+                logger.error("kube-bench run failed: %s" % error)
+                raise kopf.PermanentError("kube-bench run failed !!!")
             elif output:
                 bench_result = json.loads(output.decode("UTF-8"))
 
