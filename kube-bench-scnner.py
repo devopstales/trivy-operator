@@ -1,3 +1,4 @@
+from genericpath import exists
 import kopf
 import kubernetes.client as k8s_client
 import kubernetes.config as k8s_config
@@ -8,7 +9,7 @@ import pycron
 import os
 import subprocess
 import json
-# import prometheus_client
+import prometheus_client
 
 #############################################################################
 # ToDo
@@ -25,7 +26,7 @@ IN_CLUSTER = os.getenv("IN_CLUSTER", False) in ('true', '1', 'True', 't', 'yes',
 FORMAT = '[%(asctime)s] %(name)s         [VERBOSE_LOG] %(message)s'
 
 logging.basicConfig(format=FORMAT)
-MyLogger = logging.getLogger("trivy-operator")
+MyLogger = logging.getLogger("kube-bench-scnner")
 MyLogger.setLevel(logging.WARNING)
 
 if VERBOSE_LOG:
@@ -41,10 +42,26 @@ def configure(settings: kopf.OperatorSettings, **_):
     settings.posting.level = LOG_LEVEL
 
 #############################################################################
+# Pretasks
+#############################################################################
+
+CIS_VULN = prometheus_client.Gauge(
+    'cis_results',
+    'Details of CIS benchmarks for cluster',
+    ['hostname', 'scored', 'status', 'test_number', 'type']
+)
+
+"""Start Prometheus Exporter"""
+
+@kopf.on.startup()
+async def startup_fn_prometheus_client(logger, **kwargs):
+    prometheus_client.start_http_server(9115)
+    logger.info("Prometheus Exporter started...")
+
+#############################################################################
 # ClustereScanner Scanner
 #############################################################################
 
-#@kopf.on.create('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
 @kopf.on.resume('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
 async def startup_sc( logger, spec, **kwargs):
     logger.info("ClustereScanner Created")
@@ -77,9 +94,9 @@ async def startup_sc( logger, spec, **kwargs):
         logger.info("ClustereScannerProfile is not configured")
 
     if scan_profile is not None:
-        KUBE_BENCH_COMMAND = [ "kube-bench", "--benchmark", scan_profile, "--json" ]
+        KUBE_BENCH_COMMAND = [ "kube-bench", "--nosummary", "--nototals", "--noremediations", "--benchmark", scan_profile, "--json" ]
     else:
-        KUBE_BENCH_COMMAND = [ "kube-bench", "--json" ]
+        KUBE_BENCH_COMMAND = [ "kube-bench", "--nosummary", "--nototals", "--noremediations", "--json" ]
 
 # -s [master node controlplane etcd policies]
 # --benchmark [ack-1.0 aks-1.0 cis-1.20 cis-1.23 cis-1.5 cis-1.6 eks-1.0.1 gke-1.0 gke-1.2.0 rh-0.7 rh-1.0]
@@ -95,7 +112,6 @@ async def startup_sc( logger, spec, **kwargs):
             api_response = api_instance.get_cluster_custom_object(
                 group, version, plural, name
             )
-            MyLogger.info("api_response: %s" % api_response) # WARNING
             return True
         except ApiException as e:
             if e.status != 404:
@@ -169,8 +185,10 @@ async def startup_sc( logger, spec, **kwargs):
                 },
             }
 
-            for item in bench_result["Controls"]:
+            for item in bench_result:
+                MyLogger.info("Node Type: %s" % item["node_type"]) # warning
                 for test in item["tests"]:
+                    MyLogger.info("Tets: %s" % test["desc"]) # warning
                   #  ClusterPolicyReport["summary"]["error"] += 
                     ClusterPolicyReport["summary"]["fail"] += test["fail"]
                     ClusterPolicyReport["summary"]["pass"] += test["pass"]
@@ -203,6 +221,30 @@ async def startup_sc( logger, spec, **kwargs):
                             "source": "CIS Vulnerability"
                         }
                         ClusterPolicyReport["results"] += [report]
+
+                        """Generate Metricfile"""
+                        MyLogger.info("id: %s" % result["test_number"]) # warning
+                        if "manual" in result["type"]:
+                            result_type = result["type"]
+                        else:
+                            result_type = "automated"
+
+                        if "PASS" in result["status"]:
+                            CIS_VULN.labels(
+                                NODE_NAME,
+                                result["scored"],
+                                result["status"],
+                                result["test_number"],
+                                result_type,
+                            ).set(0)
+                        else:
+                            CIS_VULN.labels(
+                                NODE_NAME,
+                                result["scored"],
+                                result["status"],
+                                result["test_number"],
+                                result_type,
+                            ).set(1)
 
             is_pClusterPolicyReport_exists = get_clusterpolicyreports(report_name)
             MyLogger.info("DEBUG - is_pClusterPolicyReport_exists: %s" % is_pClusterPolicyReport_exists) # WARNING
