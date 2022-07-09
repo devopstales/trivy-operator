@@ -1,5 +1,6 @@
 # Customize
 docker/*.py
+docker/*/*.py
 docker/trivy-operator/trivy
 docker/kube-bench-scnner/kube-bench
 old/

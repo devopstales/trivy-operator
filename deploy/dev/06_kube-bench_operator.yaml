@@ -28,46 +28,52 @@ spec:
         imagePullPolicy: IfNotPresent
         name: kube-bench-scnner
         env:
+        - name: VERBOSE_LOG
+          value: "true"
         - name: NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
         volumeMounts:
-            - name: var-lib-etcd
-              mountPath: /var/lib/etcd
-              readOnly: true
-            - name: var-lib-kubelet
-              mountPath: /var/lib/kubelet
-              readOnly: true
-            - name: var-lib-kube-scheduler
-              mountPath: /var/lib/kube-scheduler
-              readOnly: true
-            - name: var-lib-kube-controller-manager
-              mountPath: /var/lib/kube-controller-manager
-              readOnly: true
-            - name: etc-systemd
-              mountPath: /etc/systemd
-              readOnly: true
-            - name: lib-systemd
-              mountPath: /lib/systemd/
-              readOnly: true
-            - name: srv-kubernetes
-              mountPath: /srv/kubernetes/
-              readOnly: true
-            - name: etc-kubernetes
-              mountPath: /etc/kubernetes
-              readOnly: true
-              # /usr/local/mount-from-host/bin is mounted to access kubectl / kubelet, for auto-detecting the Kubernetes version.
-              # You can omit this mount if you specify --version as part of the command.
-            - name: usr-bin
-              mountPath: /usr/local/mount-from-host/bin
-              readOnly: true
-            - name: etc-cni-netd
-              mountPath: /etc/cni/net.d/
-              readOnly: true
-            - name: opt-cni-bin
-              mountPath: /opt/cni/bin/
-              readOnly: true
+          - name: var-lib-etcd
+            mountPath: /var/lib/etcd
+            readOnly: true
+          - name: var-lib-kubelet
+            mountPath: /var/lib/kubelet
+            readOnly: true
+          - name: var-lib-kube-scheduler
+            mountPath: /var/lib/kube-scheduler
+            readOnly: true
+          - name: var-lib-kube-controller-manager
+            mountPath: /var/lib/kube-controller-manager
+            readOnly: true
+          - name: etc-systemd
+            mountPath: /etc/systemd
+            readOnly: true
+          - name: lib-systemd
+            mountPath: /lib/systemd/
+            readOnly: true
+          - name: srv-kubernetes
+            mountPath: /srv/kubernetes/
+            readOnly: true
+          - name: etc-kubernetes
+            mountPath: /etc/kubernetes
+            readOnly: true
+          - name: usr-bin
+            mountPath: /usr/local/mount-from-host/bin
+            readOnly: true
+          - name: etc-cni-netd
+            mountPath: /etc/cni/net.d/
+            readOnly: true
+          - name: opt-cni-bin
+            mountPath: /opt/cni/bin/
+            readOnly: true
+          - name: etc-passwd
+            mountPath: /etc/passwd
+            readOnly: true
+          - name: etc-group
+            mountPath: /etc/group
+            readOnly: true
         ports:
           - containerPort: 9115
       volumes:
@@ -104,6 +110,12 @@ spec:
         - name: opt-cni-bin
           hostPath:
             path: "/opt/cni/bin/"
+        - name: etc-passwd
+          hostPath:
+            path: "/etc/passwd"
+        - name: etc-group
+          hostPath:
+            path: "/etc/group"
 ---
 apiVersion: v1
 kind: Service

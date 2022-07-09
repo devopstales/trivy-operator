@@ -5,8 +5,7 @@ ENV IN_CLUSTER=true
 
 COPY entrypoint.sh /entrypoint.sh
 
-RUN apk -U update procps && \
-    apk add --no-cache apk-tools openssl bash && \
+RUN apk add --no-cache procps apk-tools openssl bash && \
     apk upgrade
 
 RUN wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \

@@ -830,6 +830,21 @@ async def create_fn( logger, spec, **kwargs):
             await asyncio.sleep(15)
 
 #############################################################################
+# ClustereScanner Scanner
+#############################################################################
+
+@kopf.on.create('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
+async def startup_sc_eployer( logger, spec, **kwargs):
+    logger.info("ClustereScanner Created")
+
+    try:
+        scan_profile = spec['scanProfileName']
+        logger.info("ClustereScannerProfile is set to %s" % scan_profile)
+    except:
+        scan_profile = None
+        logger.info("ClustereScannerProfile is not configured")
+
+#############################################################################
 # Admission Controller
 #############################################################################
 
