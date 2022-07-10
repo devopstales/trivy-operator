@@ -2,32 +2,62 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://devopstales.github.io/trivy-operator/2.4/</loc>
-         <lastmod>2022-06-30</lastmod>
+         <lastmod>2022-07-10</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/trivy-operator/2.4/configuration/</loc>
-         <lastmod>2022-06-30</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://devopstales.github.io/trivy-operator/2.4/image-validator/</loc>
-         <lastmod>2022-06-30</lastmod>
+         <lastmod>2022-07-10</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/trivy-operator/2.4/installation/</loc>
-         <lastmod>2022-06-30</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://devopstales.github.io/trivy-operator/2.4/monitoring/</loc>
-         <lastmod>2022-06-30</lastmod>
+         <lastmod>2022-07-10</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://devopstales.github.io/trivy-operator/2.4/quickstart/</loc>
-         <lastmod>2022-06-30</lastmod>
+         <lastmod>2022-07-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/trivy-operator/2.4/crds/</loc>
+         <lastmod>2022-07-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/trivy-operator/2.4/crds/cluster-policy-report/</loc>
+         <lastmod>2022-07-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/trivy-operator/2.4/crds/namespace-scanner/</loc>
+         <lastmod>2022-07-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/trivy-operator/2.4/crds/policy-report/</loc>
+         <lastmod>2022-07-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/trivy-operator/2.4/crds/vulnerability-report/</loc>
+         <lastmod>2022-07-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/trivy-operator/2.4/functions/image-validator/</loc>
+         <lastmod>2022-07-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/trivy-operator/2.4/integrations/monitoring/</loc>
+         <lastmod>2022-07-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://devopstales.github.io/trivy-operator/2.4/integrations/policy-reporter/</loc>
+         <lastmod>2022-07-10</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>
