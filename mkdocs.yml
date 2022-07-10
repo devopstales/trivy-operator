@@ -8,11 +8,19 @@ edit_uri: ""
 
 nav:
     - Overview: index.md
-    - Installation: installation.md
     - Quick Start: quickstart.md
+    - Installation: installation.md
     - Configuration: configuration.md
-    - Admission Controller: image-validator.md
-    - Monitoring: monitoring.md
+    - Functions:
+        - Admission Controller: functions/image-validator.md
+    - Integrations:
+        - Monitoring: integrations/monitoring.md
+        - Policy Reporter: integrations/policy-reporter.md
+    - Custom Resource Definitions:
+        - Overview: crds/index.md
+        - NamespaceScanner: crds/amespace-scanner.md
+        - VulnerabilityReport: crds/vulnerability-report.md
+        - PolicyReport: crds/policy-report.md
 
 
 theme:
