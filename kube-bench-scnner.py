@@ -63,6 +63,7 @@ async def startup_fn_prometheus_client(logger, **kwargs):
 #############################################################################
 
 @kopf.on.resume('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
+@kopf.on.create('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
 async def startup_sc( logger, spec, **kwargs):
     logger.info("ClustereScanner Created")
 
@@ -133,10 +134,10 @@ async def startup_sc( logger, spec, **kwargs):
         try:
             api_response = api_instance.create_cluster_custom_object(
                 group, version, plural, body, pretty=pretty, field_manager=field_manager)
-            logger.info("New policyReport created") # WARNING
+            logger.info("New clusterPolicyReport created") # WARNING
         except ApiException as e:
             if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
-                logger.info("policyReport %s already exists!!!" % name)
+                logger.info("clusterPolicyReport %s already exists!!!" % name)
             else:
                 print("Exception when creating clusterpolicyreport - %s : %s\n" % (name, e))
 
@@ -250,7 +251,7 @@ async def startup_sc( logger, spec, **kwargs):
             MyLogger.info("DEBUG - is_pClusterPolicyReport_exists: %s" % is_pClusterPolicyReport_exists) # WARNING
 
             if is_pClusterPolicyReport_exists:
-                logger.info("policyReport need deletion") # WARNING
+                logger.info("clusterPolicyReport need deletion") # WARNING
                 delete_clusterpolicyreports(report_name)
                 create_clusterpolicyreports(ClusterPolicyReport, report_name)
             else:
