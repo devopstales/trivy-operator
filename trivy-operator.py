@@ -23,6 +23,7 @@ import uuid
 #############################################################################
 # Operator
 ## Get pull secret from ServiceAccount ref
+## Add tivy sbom scan
 ## Add kube-hunter as scanner
 ## Integration with OWASP Defectdojo
 #############################################################################
@@ -114,6 +115,12 @@ async def startup_fn_prometheus_client(logger, **kwargs):
 async def create_fn( logger, spec, **kwargs):
     logger.info("NamespaceScanner Created")
 
+    registry_list = []
+    secret_names = None
+    current_namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+    clusterWide = None
+    namespaceSelector = None
+
     if IN_CLUSTER:
         k8s_config.load_incluster_config()
     else:
@@ -129,7 +136,6 @@ async def create_fn( logger, spec, **kwargs):
         logger.error("namespace-scanner: crontab must be set !!!")
         raise kopf.PermanentError("namespace-scanner: crontab must be set")
 
-    clusterWide = None
     try:
         clusterWide = bool(spec['clusterWide'])
         logger.debug("namespace-scanners - clusterWide:") # debuglog
@@ -138,7 +144,6 @@ async def create_fn( logger, spec, **kwargs):
         logger.warning("clusterWide is not set, checking namespaceSelector")
         clusterWide = False
 
-    namespaceSelector = None
     try:
         namespaceSelector = spec['namespace_selector']
         logger.debug("namespace-scanners - namespace_selector:") # debuglog
@@ -146,9 +151,6 @@ async def create_fn( logger, spec, **kwargs):
     except:
         logger.warning("namespace_selector is not set")
 
-    registry_list = []
-    secret_names = None
-    current_namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
     try:
         secret_names = spec['image_pull_secrets']
         secret_names_present = True
@@ -156,6 +158,13 @@ async def create_fn( logger, spec, **kwargs):
     except:
         secret_names_present = False
         logger.warning("image_pull_secrets is not set")
+
+    if secret_names_present:
+        pull_secret_decoder(secret_names, current_namespace)
+
+    if clusterWide == False and namespaceSelector is None:
+        logger.error("Either clusterWide need to be set to 'true' or namespace_selector should be set")
+        raise kopf.PermanentError("Either clusterWide need to be set to 'true' or namespace_selector should be set")
 
     """Get auth data from pull secret"""
     def pull_secret_decoder(secret_names, secret_namespace):
@@ -168,13 +177,6 @@ async def create_fn( logger, spec, **kwargs):
                 logger.debug(format(data['auths'])) # debuglog
             except:
                 logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
-
-    if secret_names_present:
-        pull_secret_decoder(secret_names, current_namespace)
-
-    if clusterWide == False and namespaceSelector is None:
-        logger.error("Either clusterWide need to be set to 'true' or namespace_selector should be set")
-        raise kopf.PermanentError("Either clusterWide need to be set to 'true' or namespace_selector should be set")
 
     """Generate VulnerabilityReport"""
     def create_vulnerabilityreports(body, namespace, name):
@@ -830,21 +832,6 @@ async def create_fn( logger, spec, **kwargs):
             await asyncio.sleep(15)
 
 #############################################################################
-# ClustereScanner Scanner
-#############################################################################
-
-@kopf.on.create('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
-async def startup_sc_eployer( logger, spec, **kwargs):
-    logger.info("ClustereScanner Created")
-
-    try:
-        scan_profile = spec['scanProfileName']
-        logger.info("ClustereScannerProfile is set to %s" % scan_profile)
-    except:
-        scan_profile = None
-        logger.info("ClustereScannerProfile is not configured")
-
-#############################################################################
 # Admission Controller
 #############################################################################
 
@@ -1187,6 +1174,157 @@ if AC_ENABLED:
                     else:
                         #                    logger.info("%s is ok" % (sev)) # Debug
                         continue
+
+#############################################################################
+# ClustereScanner
+#############################################################################
+
+"""Test daemonset"""
+def test_daemonset_exists(namespace, name):
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.AppsV1Api(api_client)
+    try:
+        api_response = api_instance.read_namespaced_daemon_set(
+            name, namespace )
+        return True
+    except ApiException as e:
+        if e.status != 404:
+            print("Exception when testing daemonset - %s : %s\n" % (name, e))
+            return False
+        else:
+            return False
+
+"""Generate daemonset"""
+def create_daemonset(body, namespace, name):
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.AppsV1Api(api_client)
+        pretty = 'true'
+        field_manager = 'trivy-operator'
+        body = body
+        namespace = namespace
+    try:
+        api_response = api_instance.create_namespaced_daemon_set(
+            namespace, body, pretty=pretty,  field_manager=field_manager)
+    except ApiException as e:
+        if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
+            logger.info("daemonset %s already exists!!!" % name)
+        else:
+            print("Exception when creating daemonset - %s : %s\n" % (name, e))
+
+"""Delete daemonset"""
+def delete_daemonset(namespace, name):
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.AppsV1Api(api_client)
+    try:
+        api_response = api_instance.delete_namespaced_daemon_set(
+            name, namespace)
+    except ApiException as e:
+        print("Exception when deleting daemonset - %s : %s\n" % (name, e))
+
+#############################################################################
+
+@kopf.on.resume('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
+@kopf.on.create('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
+async def startup_sc_deployer( logger, spec, **kwargs):
+    logger.info("ClustereScanner Created")
+
+    ds_name = "kube-bech-scanner"
+    ds_image = "devopstales/kube-bench-scnner:2.5-devel"
+    pod_name = os.environ.get("POD_NAME")
+    pod_uid = os.environ.get("POD_UID")
+    namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+
+    try:
+        service_account = os.environ.get("SERVICE_ACCOUNT")
+    except:
+        service_account = None
+        logger.info("ClustereScannerProfile is not configured")
+        raise kopf.AdmissionError("ClustereScannerProfile is not configured")
+
+    try:
+        scan_profile = spec['scanProfileName']
+        logger.info("ClustereScannerProfile is set to %s" % scan_profile)
+    except:
+        scan_profile = None
+        logger.info("serviceAccountName is not in environment variables")
+
+    daemonset = {
+        "apiVersion": "apps/v1",
+        "kind": "DaemonSet",
+        "metadata": { 
+            "name": ds_name, 
+            "labels": { "app": ds_name },
+            "annotations": { "prometheus.io/port": "9115", "prometheus.io/scrape": "true" }
+        },
+        "spec": {
+            "selector": { "matchLabels": { "app": ds_name, } },
+            "template": { 
+                "metadata": { "labels": { "app": ds_name, } },
+                "spec": { 
+                    "hostPID": True,
+                    "serviceAccountName": service_account,
+                    "containers": [ {
+                        "name": ds_name,
+                        "image": ds_image,
+                        "ports": [ { "containerPort": 9115 } ],
+                        "env": [ { "name": "NODE_NAME", "valueFrom": { "fieldRef": { "fieldPath": "spec.nodeName" } } } ],
+                    } ],
+                },
+            }
+        },
+    }
+
+    if pod_name:
+        daemonset['metadata']['ownerReferences'] = [ { "apiVersion": "v1", "kind": "Pod", "name": pod_name, "uid": pod_uid, "blockOwnerDeletion": False, "controller": True, } ]
+
+    daemonset['spec']['template']['spec']['containers'][0]['volumeMounts'] = [
+        { "name": "var-lib-etcd", "mountPath": "/var/lib/etcd", "readOnly": True },
+        { "name": "var-lib-kubelet", "mountPath": "/var/lib/kubelet", "readOnly": True },
+        { "name": "var-lib-kube-scheduler", "mountPath": "/var/lib/kube-scheduler", "readOnly": True },
+        { "name": "var-lib-kube-controller-manager", "mountPath": "/var/lib/kube-controller-manager", "readOnly": True },
+        { "name": "etc-systemd", "mountPath": "/etc/systemd", "readOnly": True },
+        { "name": "lib-systemd", "mountPath": "/lib/systemd/", "readOnly": True },
+        { "name": "srv-kubernetes", "mountPath": "/srv/kubernetes/", "readOnly": True },
+        { "name": "etc-kubernetes", "mountPath": "/etc/kubernetes", "readOnly": True },
+        { "name": "usr-bin", "mountPath": "/usr/local/mount-from-host/bin", "readOnly": True },
+        { "name": "etc-cni-netd", "mountPath": "/etc/cni/net.d/", "readOnly": True },
+        { "name": "opt-cni-bin", "mountPath": "/opt/cni/bin/", "readOnly": True },
+        { "name": "etc-passwd", "mountPath": "/etc/passwd", "readOnly": True },
+        { "name": "etc-group", "mountPath": "/etc/group", "readOnly": True },
+    ]
+    daemonset['spec']['template']['spec']['volumes'] = [
+        { "name": "var-lib-etcd", "hostPath": { "path": "/var/lib/etcd" } },
+        { "name": "var-lib-kubelet", "hostPath": { "path": "/var/lib/kubelet" } },
+        { "name": "var-lib-kube-scheduler", "hostPath": { "path": "/var/lib/kube-scheduler" } },
+        { "name": "var-lib-kube-controller-manager", "hostPath": { "path": "/var/lib/kube-controller-manager" } },
+        { "name": "etc-systemd", "hostPath": { "path": "/etc/systemd" } },
+        { "name": "lib-systemd", "hostPath": { "path": "/lib/systemd" } },
+        { "name": "srv-kubernetes", "hostPath": { "path": "/srv/kubernetes" } },
+        { "name": "etc-kubernetes", "hostPath": { "path": "/etc/kubernetes" } },
+        { "name": "usr-bin", "hostPath": { "path": "/usr/bin" } },
+        { "name": "etc-cni-netd", "hostPath": { "path": "/etc/cni/net.d/" } },
+        { "name": "opt-cni-bin", "hostPath": { "path": "/opt/cni/bin/" } },
+        { "name": "etc-passwd", "hostPath": { "path": "/etc/passwd" } },
+        { "name": "etc-group", "hostPath": { "path": "/etc/group" } },
+    ]
+
+    is_daemonset_exists = test_daemonset_exists(namespace, ds_name)
+
+    if is_daemonset_exists:
+        logger.info("daemonset already exists") # WARNING
+    else:
+        create_daemonset(daemonset, namespace, ds_name)
+
+@kopf.on.delete('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
+async def startup_sc_deleter( logger, spec, **kwargs):
+    ds_name = "kube-bech-scanner"
+    namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+    is_daemonset_exists = test_daemonset_exists(namespace, ds_name)
+
+    if is_daemonset_exists:
+        delete_daemonset(namespace, ds_name)
+    else:
+        logger.info("daemonset dose not exists: nothing to delete") # WARNING
 
 #############################################################################
 # print to operator log
