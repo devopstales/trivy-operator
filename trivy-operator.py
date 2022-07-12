@@ -125,6 +125,15 @@ async def create_fn( logger, spec, **kwargs):
         logger.info("clusterWide is not set, checking namespaceSelector")
         clusterWide = False
 
+    policyreport = None
+    try:
+        policyreport = bool(spec['policyreport'])
+        logger.debug("namespace-scanners - policyreport:") # debuglog
+        logger.debug(format(policyreport)) # debuglog
+    except:
+        logger.info("policyreport is not set")
+        policyreport = False
+
     namespaceSelector = None
     try:
         namespaceSelector = spec['namespace_selector']
@@ -754,15 +763,16 @@ async def create_fn( logger, spec, **kwargs):
                 else:
                     create_vulnerabilityreports(vulnerabilityReport, namespace, vr_name)
 
-                is_policyreports_exists = get_policyreports(namespace, pr_name)
-                MyLogger.info("DEBUG - is_policyreports_exists: %s" % is_policyreports_exists) # WARNING
+                if policyreport:
+                    is_policyreports_exists = get_policyreports(namespace, pr_name)
+                    MyLogger.info("DEBUG - is_policyreports_exists: %s" % is_policyreports_exists) # WARNING
 
-                if is_policyreports_exists:
-                    MyLogger.info("policyReport need deletion") # WARNING
-                    delete_policyreports(namespace, pr_name)
-                    create_policyreports(policyReport, namespace, pr_name)
-                else:
-                    create_policyreports(policyReport, namespace, pr_name)
+                    if is_policyreports_exists:
+                        MyLogger.info("policyReport need deletion") # WARNING
+                        delete_policyreports(namespace, pr_name)
+                        create_policyreports(policyReport, namespace, pr_name)
+                    else:
+                        create_policyreports(policyReport, namespace, pr_name)
 
 
             """Generate Metricfile"""
