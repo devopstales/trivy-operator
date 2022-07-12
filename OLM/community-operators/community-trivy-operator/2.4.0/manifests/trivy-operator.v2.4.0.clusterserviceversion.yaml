@@ -21,6 +21,7 @@ metadata:
             "crontab": "*/5 * * * *",
             "namespace_selector": "trivy-scan",
             "clusterWide": "False",
+            "policyreport": "False",
             "registry": [
               {
                 "name": "docker.io",
@@ -36,31 +37,18 @@ metadata:
 spec:
   customresourcedefinitions:
     owned:
-    - description: Configuration for trivy-operator.
-      displayName: NamespaceScanner
-      kind: NamespaceScanner
+    - kind: NamespaceScanner
       name: namespace-scanners.trivy-operator.devopstales.io
-      resources:
-      - kind: Service
-        version: v1
-      - kind: Deployment
-        version: apps/v1
-      specDescriptors:
-      - description: Schedule scans of namespaces.
-        displayName: Crontab
-        path: crontab
-      - description: Name of the label to select scannable namespaces.
-        displayName: Namespace Selector
-        path: namespace_selector
-      - description: Specifies how to authenticate to specific registries.
-        displayName: Registry
-        path: registry
       version: v1
-    - description: VulnerabilityReport is an object to store scan results.
-      displayName: VulnerabilityReport
-      kind: VulnerabilityReport
+      displayName: NamespaceScanner
+      description: Confifuration for trivy-operator.
+    - kind: VulnerabilityReport
       name: vulnerabilityreports.trivy-operator.devopstales.io
       version: v1
+      displayName: VulnerabilityReport
+      description: |
+        VulnerabilityReport summarizes vulnerabilities in application dependencies and operating system packages
+        built into container images.
   description: |
     Trivy Operator for scheduled image scans and an Admission Control.
 
@@ -77,15 +65,7 @@ spec:
     ### Scheduled Image scans
     Default every 5 minutes execute a scan script. It will get image list from all namespaces with the label `trivy-scan=true`, and then scan this images with trivy, finally we will get metrics on `http://[pod-ip]:9115/metrics`
 
-    ```bash
-    ...
-    env:
-    - name: ADMISSION_CONTROLLER
-      value: "True"
-    ```
-
-    ### Trivy Image Validator
-    The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy if it is in a namespace with the label `trivy-operator-validation=true`.
+    You can chane the schedule of the image scanning by setting the `crontab` variable in the namespace-scanner object.
 
     ### Cache Scan results
     From the 2.4 version you can use an external redis to store scanning results and speed up the scanning process.
@@ -113,7 +93,12 @@ spec:
         claimName: trivy-cache
     ```
 
-    ### Usage
+    ### Trivy Image Validator
+    The admission controller function can be configured as a ValidatingWebhook in a k8s cluster. Kubernetes will send requests to the admission server when a Pod creation is initiated. The admission controller checks the image using trivy if it is in a namespace with the label `trivy-operator-validation=true`.
+
+    To enable the admission controller you need to set the `clusterWide` variable to `true` in the namespace-scanner object.
+
+    Enable the scheduled scan and the admission controller for a specific namespace:
     ```bash
     kubectl label namespaces test-apps trivy-scan=true
     # or
@@ -133,6 +118,9 @@ spec:
             trivy.security.devopstales.io/critical: "2"
     ...
     ```
+
+    ### Monitorng
+    Trivy operator has a prometheus endpoint wher yo can get the resoults of the namespace scans and the adission controller.
 
     ```bash
     curl -s http://10.43.179.39:9115/metrics | grep so_vulnerabilities
@@ -162,6 +150,18 @@ spec:
     ac_vulnerabilities{exported_namespace="trivytest",image="nginxinc/nginx-unprivileged:latest",severity="HIGH"} 6.0
     ac_vulnerabilities{exported_namespace="trivytest",image="nginxinc/nginx-unprivileged:latest",severity="CRITICAL"} 4.0
     ```
+
+    ### Policy Report reation
+    The PolicyReport object is a protopype object probosed by the Kubernetes policy work group. The Policy Report Custom Resource Definition (CRD) can be used as a common way to provide policy results to Kubernetes cluster administrators and users, using native tools. 
+
+    Add the PolicyReport CRDs to your cluster (v1alpha2):
+    ```bash
+    kubectl create -f https://github.com/kubernetes-sigs/wg-policy-prototypes/raw/master/policy-report/crd/v1alpha2/wgpolicyk8s.io_policyreports.yaml
+    ```
+
+    You can enable the Policy Report creatin by setting the `policyreport` to `True` in the NamespaceScanner object.
+
+    This objects can be visualized by the Policy Reporter UI. The Policy Reporter UI is a monitoring and Observability Tool for the PolicyReport CRD with an optional UI. It is created by Kyverno. The main goal was a tool to visualize the resoluts of the Kyverno policies, but because it uses the PolicyReports CRD it can visualize the resoults of the trivy-operator scans.
   displayName: Community Trivy Operator
   minKubeVersion: "1.19.0"
   icon:
@@ -201,25 +201,9 @@ spec:
         - apiGroups:
             - "apiextensions.k8s.io"
           resources:
-            - customresourcedefinitions
+            - "customresourcedefinitions"
           verbs: 
-            - create
-        - apiGroups:
-          - "wgpolicyk8s.io"
-          resources:
-          - policyreports
-          verbs:
-            - get
-            - create
-            - delete
-        - apiGroups:
-          - "trivy-operator.devopstales.io"
-          resources:
-          - vulnerabilityreports
-          verbs:
-            - get
-            - create
-            - delete
+            - "create"
         - apiGroups:
           - "trivy-operator.devopstales.io"
           resources:
@@ -300,7 +284,7 @@ spec:
               serviceAccountName: trivy-operator
               containers:
               - name: trivy-operator
-                image: "devopstales/trivy-operator:2.3"
+                image: "devopstales/trivy-operator:2.4"
                 imagePullPolicy: Always
                 env:
                 - name: POD_NAMESPACE
