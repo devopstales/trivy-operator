@@ -159,9 +159,6 @@ async def create_fn( logger, spec, **kwargs):
         secret_names_present = False
         logger.warning("image_pull_secrets is not set")
 
-    if secret_names_present:
-        pull_secret_decoder(secret_names, current_namespace)
-
     if clusterWide == False and namespaceSelector is None:
         logger.error("Either clusterWide need to be set to 'true' or namespace_selector should be set")
         raise kopf.PermanentError("Either clusterWide need to be set to 'true' or namespace_selector should be set")
@@ -177,6 +174,9 @@ async def create_fn( logger, spec, **kwargs):
                 logger.debug(format(data['auths'])) # debuglog
             except:
                 logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
+
+    if secret_names_present:
+        pull_secret_decoder(secret_names, current_namespace)
 
     """Generate VulnerabilityReport"""
     def create_vulnerabilityreports(body, namespace, name):
@@ -292,7 +292,6 @@ async def create_fn( logger, spec, **kwargs):
 
     while True:
         if pycron.is_now(crontab):
-            """Find Namespaces"""
             unique_image_list = {}
             pod_list = {}
             trivy_result_list = {}
@@ -301,6 +300,7 @@ async def create_fn( logger, spec, **kwargs):
             tagged_ns_list = []
             policy_report = {}
 
+            """Find Namespaces"""
             namespace_list = k8s_client.CoreV1Api().list_namespace()
             logger.debug("namespace list begin:") # debuglog
             logger.debug(format(namespace_list)) # debuglog
