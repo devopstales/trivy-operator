@@ -18,7 +18,6 @@ from OpenSSL import crypto
 from datetime import datetime, timezone
 import logging
 import uuid
-import str2bool
 
 #############################################################################
 # Logging
@@ -78,6 +77,9 @@ if REDIS_ENABLED:
 #############################################################################
 # Pretasks
 #############################################################################
+
+def str2bool(v):
+  return v in ("yes", "true", "t", "1", "True", True)
 
 """Download trivy cache """
 
