@@ -18,6 +18,7 @@ from OpenSSL import crypto
 from datetime import datetime, timezone
 import logging
 import uuid
+import str2bool
 
 #############################################################################
 # Logging
@@ -118,7 +119,7 @@ async def create_fn( logger, spec, **kwargs):
 
     clusterWide = None
     try:
-        clusterWide = bool(spec['clusterWide'])
+        clusterWide = str2bool(spec['clusterWide'])
         logger.debug("namespace-scanners - clusterWide:") # debuglog
         logger.debug(format(clusterWide)) # debuglog
     except:
@@ -127,7 +128,7 @@ async def create_fn( logger, spec, **kwargs):
 
     policyreport = None
     try:
-        policyreport = bool(spec['policyreport'])
+        policyreport = str2bool(spec['policyreport'])
         logger.debug("namespace-scanners - policyreport:") # debuglog
         logger.debug(format(policyreport)) # debuglog
     except:
@@ -293,6 +294,7 @@ async def create_fn( logger, spec, **kwargs):
                 logger.debug("labels and namespace end") # debuglog
                 for label_key, label_value in ns_label_list:
                     if clusterWide or (namespaceSelector == label_key and bool(label_value) == True):
+                        logger.info("Select Namespace: %s" % ns_name)
                         tagged_ns_list.append(ns_name)
                     else:
                         continue
