@@ -1,7 +1,9 @@
 image:
   repository: devopstales/trivy-operator
   pullPolicy: Always
-  tag: "2.4"
+  tag: "2.4.1"
+
+TimeZone: UTC
 
 log_level: "INFO"
 # INFO, HIGH, DEBUG
