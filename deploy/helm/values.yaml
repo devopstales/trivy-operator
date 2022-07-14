@@ -3,6 +3,7 @@ image:
   pullPolicy: Always
   tag: "2.4"
 
+# Log level
 log_level: "INFO"
 # INFO, HIGH, DEBUG
 
@@ -16,12 +17,14 @@ serviceAccount:
   annotations: {}
   name: "trivy-operator"
 
+# enable tu deploy redis as cache
 cache:
   enabled: false
 
 monitoring:
   port: "9115"
 
+# deploy service monitor
 serviceMonitor:
   enabled: false
   namespace: "kube-system"
@@ -42,14 +45,18 @@ persistence:
   ##
   # storageClass: "-"
 
+# content foc ns-scan CRD
 namespaceScanner:
   crontab: "*/5 * * * *"
   namespaceSelector: "trivy-scan"
   clusterWide: false
+  policyreport: false
 
+# enable adission controller
 admissionController:
   enabled: false
 
+# authentication informatin for trivy to use wen scan image
 registryAuth:
   enabled: false
   registry:
@@ -57,7 +64,35 @@ registryAuth:
     user: "user"
     password: "password"
 
+# github authentiation token for trivy database download
 githubToken:
   enabled: false
   token: ""
 
+## Define which Nodes the Pods are scheduled on.
+## ref: https://kubernetes.io/docs/user-guide/node-selection/
+##
+nodeSelector: {}
+
+## Tolerations for use with node taints
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []
+# - key: "key"
+#   operator: "Equal"
+#   value: "value"
+#   effect: "NoSchedule"
+
+## Assign custom affinity rules to the trivy operator
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+##
+affinity: {}
+# nodeAffinity:
+#   requiredDuringSchedulingIgnoredDuringExecution:
+#     nodeSelectorTerms:
+#     - matchExpressions:
+#       - key: kubernetes.io/e2e-az-name
+#         operator: In
+#         values:
+#         - e2e-az1
+#         - e2e-az2

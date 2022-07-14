@@ -5,6 +5,8 @@ metadata:
 spec:
   crontab: "*/5 * * * *"
   namespace_selector: "trivy-scan"
+  clusterWide: "false"
+  policyreport: "true"
 #  registry:
 #  - name: docker.io
 #    user: "user"

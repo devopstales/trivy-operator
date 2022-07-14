@@ -6,9 +6,9 @@ metadata:
     "helm.sh/hook": post-install,post-upgrade
 spec:
   crontab: "{{ .Values.namespaceScanner.crontab }}"
-  clusterWide: "{{ .Values.namespaceScanner.clusterWide }}"
   namespace_selector: "{{ .Values.namespaceScanner.namespaceSelector }}"
   clusterWide: {{ .Values.namespaceScanner.clusterWide | default "false" }}
+  policyreport: {{ .Values.namespaceScanner.policyreport | default "false" }}
   {{- if .Values.registryAuth.enabled }}
   {{- with .Values.registryAuth.registry }}
   registry:
