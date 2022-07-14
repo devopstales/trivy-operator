@@ -33,7 +33,7 @@ devel:
 
 #devel-delete:	@ Delete local dev image with kim
 devel-delete:
-	kim image rm devopstales/trivy-operator:$(VERSION)-devel
+	kim image ls | grep devopstales | grep trivy-operator | grep $(VERSION)-devel | awk '{print "kim rmi "$$3}' | bash
 
 version:
 	cp trivy-operator.py docker/trivy-operator.py

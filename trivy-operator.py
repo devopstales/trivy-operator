@@ -4,8 +4,11 @@ import kubernetes.config as k8s_config
 from kubernetes.client.rest import ApiException
 import logging
 import prometheus_client
-import asyncio
-import pycron
+#import asyncio
+#import pycron
+from croniter import croniter
+from datetime import datetime, timedelta, timezone
+import time
 import os
 import sys
 import subprocess
@@ -13,9 +16,7 @@ import json
 import validators
 import base64
 from typing import AsyncIterator, Optional, Tuple, Collection
-from datetime import datetime
 from OpenSSL import crypto
-from datetime import datetime, timezone
 import logging
 import uuid
 
@@ -77,12 +78,32 @@ if REDIS_ENABLED:
 #############################################################################
 # Pretasks
 #############################################################################
+# Round time down to the top of the previous minute
+def roundDownTime(dt=None, dateDelta=timedelta(minutes=1)):
+    roundTo = dateDelta.total_seconds()
+    if dt == None : dt = datetime.now()
+    seconds = (dt - dt.min).seconds
+    rounding = (seconds+roundTo/2) // roundTo * roundTo
+    return dt + timedelta(0,rounding-seconds,-dt.microsecond)
+
+# Get next run time from now, based on schedule specified by cron string
+def getNextCronRunTime(schedule):
+    return croniter(schedule, datetime.now()).get_next(datetime)
+
+# Sleep till the top of the next minute
+def sleepTillTopOfNextMinute():
+    t = datetime.utcnow()
+    sleeptime = 60 - (t.second + t.microsecond/1000000.0)
+    time.sleep(sleeptime)
 
 def str2bool(v):
   return v in ("yes", "true", "t", "1", "True", True)
 
-"""Download trivy cache """
+def getCurretnTime():
+  now = datetime.now().time() # time object
+  return now
 
+"""Download trivy cache """
 @kopf.on.startup()
 async def startup_fn_trivy_cache(logger, **kwargs):
     if REDIS_ENABLED:
@@ -95,7 +116,6 @@ async def startup_fn_trivy_cache(logger, **kwargs):
     logger.info("trivy cache created...")
 
 """Start Prometheus Exporter"""
-
 @kopf.on.startup()
 async def startup_fn_prometheus_client(logger, **kwargs):
     prometheus_client.start_http_server(9115)
@@ -181,11 +201,10 @@ async def create_fn( logger, spec, **kwargs):
             api_response = api_instance.get_namespaced_custom_object(
                 group, version, namespace, plural, name
             )
-            MyLogger.info("api_response: %s" % api_response) # WARNING
             return True
         except ApiException as e:
             if e.status != 404:
-                print("Exception when testing VulnerabilityReport - %s : %s\n" % (name, e))
+                logger.error("Exception when testing VulnerabilityReport - %s : %s\n" % (name, e))
                 return False
             else:
                 return False
@@ -201,7 +220,7 @@ async def create_fn( logger, spec, **kwargs):
             api_response = api_instance.delete_namespaced_custom_object(
                 group, version, namespace, plural, name)
         except ApiException as e:
-            print("Exception when deleting VulnerabilityReport - %s : %s\n" % (name, e))
+            logger.error("Exception when deleting VulnerabilityReport - %s : %s\n" % (name, e))
 
     """Test policyReport"""
     def get_policyreports(namespace, name):
@@ -214,11 +233,10 @@ async def create_fn( logger, spec, **kwargs):
             api_response = api_instance.get_namespaced_custom_object(
                 group, version, namespace, plural, name
             )
-            MyLogger.info("api_response: %s" % api_response) # WARNING
             return True
         except ApiException as e:
             if e.status != 404:
-                print("Exception when testing policyReport - %s : %s\n" % (name, e))
+                logger.error("Exception when testing policyReport - %s : %s\n" % (name, e))
                 return False
             else:
                 return False
@@ -242,7 +260,7 @@ async def create_fn( logger, spec, **kwargs):
             if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
                 logger.info("policyReport %s already exists!!!" % name)
             else:
-                print("Exception when creating policyReport - %s : %s\n" % (name, e))
+                logger.error("Exception when creating policyReport - %s : %s\n" % (name, e))
 
     """Delete policyReport"""
     def delete_policyreports(namespace, name):
@@ -255,7 +273,7 @@ async def create_fn( logger, spec, **kwargs):
             api_response = api_instance.delete_namespaced_custom_object(
                 group, version, namespace, plural, name)
         except ApiException as e:
-            print("Exception when deleting policyReport - %s : %s\n" % (name, e))
+            logger.error("Exception when deleting policyReport - %s : %s\n" % (name, e))
 
     if IN_CLUSTER:
         k8s_config.load_incluster_config()
@@ -266,8 +284,12 @@ async def create_fn( logger, spec, **kwargs):
     # start crontab
     ############################################
 
+    nextRunTime = getNextCronRunTime(crontab)
     while True:
-        if pycron.is_now(crontab):
+        #if pycron.is_now(crontab):
+        roundedDownTime = roundDownTime()
+        if (roundedDownTime == nextRunTime):
+
             """Find Namespaces"""
             unique_image_list = {}
             pod_list = {}
@@ -411,7 +433,7 @@ async def create_fn( logger, spec, **kwargs):
                     elif b"unsupported MediaType" in error.strip():
                         logger.error(
                             "Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
-                    elif b"MANIFEST_UNKNOWN: manifest unknown; map[Tag:latest]" in error.strip():
+                    elif b"MANIFEST_UNKNOWN" in error.strip():
                         logger.error("No tag in registry")
                     else:
                         logger.error("%s" % (error.strip()))
@@ -445,10 +467,11 @@ async def create_fn( logger, spec, **kwargs):
                 docker_tag = image_name.split(':')[-1]
 
                 trivy_result = trivy_result_list[image_name]
-                #logger.debug(trivy_result) # debug
+                logger.debug(trivy_result) # debug
                 vul_report[pod_name] = []
                 policy_report[pod_name] = []
                 if trivy_result == "ERROR":
+                    logger.debug("if trivy_result == ERROR:")
                     vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
                                 "CRITICAL": 0, "ERROR": 1,
@@ -497,6 +520,7 @@ async def create_fn( logger, spec, **kwargs):
                     logger.debug(vul_list[pod_name]) # debuglog
                 else:
                     if 'Results' in trivy_result and 'Vulnerabilities' in trivy_result['Results'][0]:
+                        logger.debug("if trivy_result == OK:")
                         vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
                                 "CRITICAL": 0, "ERROR": 0,
@@ -592,6 +616,7 @@ async def create_fn( logger, spec, **kwargs):
                         logger.debug(vul_report[pod_name]) # debuglog
                         logger.debug(vul_list[pod_name]) # debuglog
                     elif 'Results' in trivy_result and 'Vulnerabilities' not in trivy_result['Results'][0]:
+                        logger.debug("if trivy_result has no Vulnerabilities:")
                         # For Alpine Linux
                         vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
@@ -786,10 +811,18 @@ async def create_fn( logger, spec, **kwargs):
                         vul_list[pod_name][1],
                         vul_list[pod_name][2], severity).set(int(vul_list[pod_name][0][severity])
                                                   )
-            MyLogger.info("------------------------------------------") # WARNING
-            await asyncio.sleep(15)
-        else:
-            await asyncio.sleep(15)
+            now = getCurretnTime()
+            MyLogger.info("CRON RUN: %s" % now) # WARNING
+            nextRunTime = getNextCronRunTime(crontab)
+        elif (roundedDownTime > nextRunTime):
+            # We missed an execution. Error. Re initialize.
+            now = getCurretnTime()
+            MyLogger.info("MISSED RUN: %s" % now) # WARNING
+            nextRunTime = getNextCronRunTime(crontab)
+        sleepTillTopOfNextMinute()
+#            await asyncio.sleep(15)
+#        else:
+#            await asyncio.sleep(15)
 
 #############################################################################
 # Admission Controller
@@ -1080,7 +1113,7 @@ if AC_ENABLED:
                 elif b"unsupported MediaType" in error.strip():
                     logger.error(
                         "Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
-                elif b"MANIFEST_UNKNOWN: manifest unknown" in error.strip():
+                elif b"MANIFEST_UNKNOWN" in error.strip():
                     logger.error("No tag in registry")
                 else:
                     logger.error("%s" % (error.strip()))
