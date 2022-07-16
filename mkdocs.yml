@@ -18,7 +18,7 @@ nav:
         - Policy Reporter: integrations/policy-reporter.md
     - Custom Resource Definitions:
         - Overview: crds/index.md
-        - NamespaceScanner: crds/amespace-scanner.md
+        - NamespaceScanner: crds/namespace-scanner.md
         - VulnerabilityReport: crds/vulnerability-report.md
         - PolicyReport: crds/policy-report.md
 
