@@ -420,6 +420,8 @@ async def create_fn( logger, spec, **kwargs):
                         os.environ['DOCKER_REGISTRY'] = registry
                         os.environ['TRIVY_USERNAME'] = reg[registry]['username']
                         os.environ['TRIVY_PASSWORD'] = reg[registry]['password']
+                        if var_test(reg[registry]['insecure']):
+                            os.environ['TRIVY_INSECURE'] = "true"
                     elif not validators.domain(registry):
                         """If registry is not an url"""
                         if reg.get("docker.io"):
