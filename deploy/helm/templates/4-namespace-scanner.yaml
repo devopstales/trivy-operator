@@ -9,9 +9,18 @@ spec:
   namespace_selector: "{{ .Values.namespaceScanner.namespaceSelector }}"
   clusterWide: {{ .Values.namespaceScanner.clusterWide | default "false" }}
   policyreport: {{ .Values.namespaceScanner.policyreport | default "false" }}
+  airGapped: {{ .Values.namespaceScanner.airGapped | default "false" }}
   {{- if .Values.registryAuth.enabled }}
+  {{- if .Values.registryAuth.image_pull_secrets }}
   {{- with .Values.registryAuth.image_pull_secrets }}
   image_pull_secrets:
   {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.registryAuth.registry }}
+  {{- with .Values.registryAuth.registry }}
+  registry:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- end }}
   {{- end }}
