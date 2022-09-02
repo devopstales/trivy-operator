@@ -7,5 +7,11 @@ spec:
   namespace_selector: "trivy-scan"
   clusterWide: "false"
   policyreport: "true"
+  airGapped: "false"
   image_pull_secrets:
     - devopstales-dockerhub
+#  registry:
+#  - name: docker.io
+#    user: "devopstales"
+#    password: ""
+#    insecure: True 

@@ -70,16 +70,21 @@ namespaceScanner:
   namespaceSelector: "trivy-scan"
   clusterWide: false
   policyreport: false
+  airGapped: false
 
 admissionController:
   enabled: false
 
 registryAuth:
-  enabled: true
+  enabled: false
   image_pull_secrets:
-    - regcrd
+    - regcred
 ## list containing the names of the image pull secrets 
 ## you want to use from the operator namespace for image pulls
+#  registry:
+#  - name: docker.io
+#    user: "user"
+#    password: "password"
 
 githubToken:
   enabled: false
