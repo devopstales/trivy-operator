@@ -1052,22 +1052,36 @@ if AC_ENABLED:
         logger.info("Admission Controller is working")
         image_list = []
         vul_list = {}
-        registry_list = {}
+        registry_list = []
+        current_namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
 
         """Try to get Registry auth values"""
         if IN_CLUSTER:
             k8s_config.load_incluster_config()
         else:
             k8s_config.load_kube_config()
+        v1 = k8s_client.CoreV1Api()
         try:
             # if no namespace-scanners created
             nsScans = k8s_client.CustomObjectsApi().list_cluster_custom_object(
                 group="trivy-operator.devopstales.io",
                 version="v1",
                 plural="namespace-scanners",
-            )
+            )           
             for nss in nsScans["items"]:
-                registry_list = nss["spec"]["registry"]
+                if nss["spec"]["registry"]:
+                    registry_list = nss["spec"]["registry"]
+                if nss["spec"]['image_pull_secrets']:
+                    secret_names = spec['image_pull_secrets']
+                    for secret_name in secret_names:
+                        try:
+                            secret = v1.read_namespaced_secret(secret_name, current_namespace)
+                            secret_data = secret.data['.dockerconfigjson']
+                            data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
+                            registry_list.append(data['auths'])
+                            logger.debug(format(data['auths'])) # debuglog
+                        except:
+                            logger.error("%s secret dose not exist in namespace %s" % (secret_name, current_namespace))
         except:
             logger.info("No ns-scan object created yet.")
 
@@ -1101,16 +1115,18 @@ if AC_ENABLED:
             """Login to registry"""
             try:
                 for reg in registry_list:
-                    if reg['name'] == registry:
-                        os.environ['DOCKER_REGISTRY'] = reg['name']
-                        os.environ['TRIVY_USERNAME'] = reg['user']
-                        os.environ['TRIVY_PASSWORD'] = reg['password']
+                    if reg.get(registry):
+                        os.environ['DOCKER_REGISTRY'] = registry
+                        os.environ['TRIVY_USERNAME'] = reg[registry]['username']
+                        os.environ['TRIVY_PASSWORD'] = reg[registry]['password']
+                        if var_test(reg[registry]['insecure']):
+                            os.environ['TRIVY_INSECURE'] = "true"
                     elif not validators.domain(registry):
                         """If registry is not an url"""
-                        if reg['name'] == "docker.io":
-                            os.environ['DOCKER_REGISTRY'] = reg['name']
-                            os.environ['TRIVY_USERNAME'] = reg['user']
-                            os.environ['TRIVY_PASSWORD'] = reg['password']
+                        if reg.get("docker.io"):
+                            os.environ['DOCKER_REGISTRY'] = "docker.io"
+                            os.environ['TRIVY_USERNAME'] = reg[registry]['username']
+                            os.environ['TRIVY_PASSWORD'] = reg[registry]['password']
             except:
                 logger.info("No registry auth config is defined.") # info
             ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
