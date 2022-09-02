@@ -2,21 +2,14 @@ import kopf
 import kubernetes.client as k8s_client
 import kubernetes.config as k8s_config
 from kubernetes.client.rest import ApiException
-import logging
 import prometheus_client
-import asyncio
-import pycron
-import os
-import subprocess
-import json
-import validators
-import base64
+import asyncio, pycron
+import os, six, json, subprocess, validators, base64
 from typing import AsyncIterator, Optional, Tuple, Collection
 from datetime import datetime
 from OpenSSL import crypto
 from datetime import datetime, timezone
-import logging
-import uuid
+import logging, uuid
 
 #############################################################################
 # ToDo
@@ -81,6 +74,16 @@ if REDIS_ENABLED:
     else:
         MyLogger.warning("Redis Cache Enabled: %s" % (REDIS_BACKEND))
 
+def var_test(var):
+  if isinstance(var, six.string_types):
+    if var.lower() in ['true']:
+      resp = True
+    else:
+      resp = False
+  else:
+    resp = False
+  return resp
+
 #############################################################################
 # Pretasks
 #############################################################################
@@ -138,7 +141,7 @@ async def create_fn( logger, spec, **kwargs):
         raise kopf.PermanentError("namespace-scanner: crontab must be set")
 
     try:
-        clusterWide = bool(spec['clusterWide'])
+        clusterWide = var_test(spec['clusterWide'])
         logger.debug("namespace-scanners - clusterWide:") # debuglog
         logger.debug(format(clusterWide)) # debuglog
     except:
@@ -146,7 +149,7 @@ async def create_fn( logger, spec, **kwargs):
         clusterWide = False
 
     try:
-        policyreport = bool(spec['policyreport'])
+        policyreport = var_test(spec['policyreport'])
         logger.debug("namespace-scanners - policyreport:") # debuglog
         logger.debug(format(policyreport)) # debuglog
     except:
@@ -174,6 +177,11 @@ async def create_fn( logger, spec, **kwargs):
 
     """Get auth data from pull secret"""
     def pull_secret_decoder(secret_names, secret_namespace):
+        try:
+            registry_list = spec['registry']
+        except:
+            logger.debug("No registry auth config is defined.") # debug
+
         for secret_name in secret_names:
             try:
                 secret = v1.read_namespaced_secret(secret_name, secret_namespace)
