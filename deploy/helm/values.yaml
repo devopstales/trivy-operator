@@ -17,6 +17,10 @@ serviceAccount:
   annotations: {}
   name: "trivy-operator"
 
+# Dont try to download trivy db, run in air-gapped env:
+offline:
+  enabled: false
+
 # enable tu deploy redis as cache
 cache:
   enabled: false

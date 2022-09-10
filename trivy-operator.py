@@ -66,6 +66,7 @@ IN_CLUSTER = os.getenv("IN_CLUSTER", False) in ('true', '1', 'True', 't', 'yes',
 IS_GLOBAL = os.getenv("IS_GLOBAL", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 REDIS_ENABLED = os.getenv("REDIS_ENABLED", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
+OFFLINE_ENABLED = os.getenv("TRIVY_SKIP_DB_UPDATE", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 if REDIS_ENABLED:
     REDIS_BACKEND = os.getenv("REDIS_BACKEND")
     if not REDIS_BACKEND:
@@ -104,16 +105,17 @@ def getCurretnTime():
   return now
 
 """Download trivy cache """
-@kopf.on.startup()
-async def startup_fn_trivy_cache(logger, **kwargs):
-    if REDIS_ENABLED:
-        TRIVY_CACHE = ["trivy", "-q", "image", "--cache-backend", REDIS_BACKEND, "--download-db-only"]
-    else:
-        TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
-    trivy_cache_result = (
-        subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
-    )
-    logger.info("trivy cache created...")
+if not OFFLINE_ENABLED:
+  @kopf.on.startup()
+  async def startup_fn_trivy_cache(logger, **kwargs):
+      if REDIS_ENABLED:
+          TRIVY_CACHE = ["trivy", "-q", "image", "--cache-backend", REDIS_BACKEND, "--download-db-only"]
+      else:
+          TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
+      trivy_cache_result = (
+          subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
+      )
+      logger.info("trivy cache created...")
 
 """Start Prometheus Exporter"""
 @kopf.on.startup()
