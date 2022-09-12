@@ -70,7 +70,6 @@ namespaceScanner:
   namespaceSelector: "trivy-scan"
   clusterWide: false
   policyreport: false
-  airGapped: false
 
 admissionController:
   enabled: false
