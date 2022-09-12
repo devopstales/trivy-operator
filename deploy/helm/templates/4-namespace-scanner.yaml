@@ -9,7 +9,6 @@ spec:
   namespace_selector: "{{ .Values.namespaceScanner.namespaceSelector }}"
   clusterWide: {{ .Values.namespaceScanner.clusterWide | default "false" }}
   policyreport: {{ .Values.namespaceScanner.policyreport | default "false" }}
-  airGapped: {{ .Values.namespaceScanner.airGapped | default "false" }}
   {{- if .Values.registryAuth.enabled }}
   {{- if .Values.registryAuth.image_pull_secrets }}
   {{- with .Values.registryAuth.image_pull_secrets }}

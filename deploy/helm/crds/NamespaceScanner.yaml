@@ -41,8 +41,6 @@ spec:
             type: string
           clusterWide:
             type: string
-          airGapped:
-            type: string
           policyreport:
             type: string
           image_pull_secrets:
