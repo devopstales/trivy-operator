@@ -60,6 +60,10 @@ spec:
         - name: REDIS_BACKEND
           value: redis://{{ include "trivy-operator.fullname" . }}-cache:6379
 {{- end }}
+{{- if .Values.offline.enabled }}
+        - name: SKIP_DB_UPDATE
+          value: "true"
+{{- end }}
 {{- if .Values.persistence.enabled }}
         volumeMounts:
         - name: cache

@@ -65,6 +65,7 @@ IN_CLUSTER = os.getenv("IN_CLUSTER", False) in ('true', '1', 'True', 't', 'yes',
 IS_GLOBAL = os.getenv("IS_GLOBAL", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 REDIS_ENABLED = os.getenv("REDIS_ENABLED", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
+OFFLINE_ENABLED = os.getenv("SKIP_DB_UPDATE", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
 
 if REDIS_ENABLED:
     REDIS_BACKEND = os.getenv("REDIS_BACKEND")
@@ -75,6 +76,9 @@ if REDIS_ENABLED:
     else:
         MyLogger.warning("Redis Cache Enabled: %s" % (REDIS_BACKEND))
     TRIVY_REDIS = ["--cache-backend", REDIS_BACKEND]
+
+if OFFLINE_ENABLED:
+    TRIVY_OFFLINE = ["--skip-db-update"]
 
 def var_test(var):
   if isinstance(var, six.string_types):
@@ -94,6 +98,9 @@ def var_test(var):
 
 @kopf.on.startup()
 async def startup_fn_trivy_cache(logger, **kwargs):
+    if OFFLINE_ENABLED:
+        logger.info("Offline mode enabled, skipping cache update")
+        return
     TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
     if REDIS_ENABLED:
       TRIVY_CACHE = TRIVY_CACHE + TRIVY_REDIS
@@ -435,6 +442,8 @@ async def create_fn( logger, spec, **kwargs):
                 TRIVY = ["trivy", "-q", "image", "-f", "json"]
                 if REDIS_ENABLED:
                     TRIVY = TRIVY + TRIVY_REDIS
+                if OFFLINE_ENABLED:
+                    TRIVY = TRIVY + TRIVY_OFFLINE
                 TRIVY = TRIVY + image_name
                 # --ignore-policy trivy.rego
 
@@ -1137,6 +1146,8 @@ if AC_ENABLED:
             TRIVY = ["trivy", "-q", "image", "-f", "json"]
             if REDIS_ENABLED:
                 TRIVY = TRIVY + TRIVY_REDIS
+            if OFFLINE_ENABLED:
+                TRIVY = TRIVY + TRIVY_OFFLINE
             TRIVY = TRIVY + image_name
             # --ignore-policy trivy.rego
 
