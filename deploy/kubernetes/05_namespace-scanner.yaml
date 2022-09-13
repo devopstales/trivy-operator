@@ -5,8 +5,9 @@ metadata:
 spec:
   crontab: "*/5 * * * *"
   namespace_selector: "trivy-scan"
-  clusterWide: "false"
-  policyreport: "true"
+  clusterWide: False
+  integrations:
+    policyreport: True
   image_pull_secrets:
     - devopstales-dockerhub
 #  registry:
