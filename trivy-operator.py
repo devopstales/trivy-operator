@@ -77,7 +77,7 @@ if REDIS_ENABLED:
     TRIVY_REDIS = ["--cache-backend", REDIS_BACKEND]
 
 if OFFLINE_ENABLED:
-    TRIVY_OFFLINE = ["--skip-db-update"]
+    TRIVY_OFFLINE = ["--skip-db-update", "--offline-scan"]
 
 def var_test(var):
   if isinstance(var, six.string_types):
