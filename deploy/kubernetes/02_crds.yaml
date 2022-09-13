@@ -33,15 +33,25 @@ spec:
       openAPIV3Schema:
         properties:
           crontab:
+            description: Crontab format expression for scheduling scans.
             pattern: ^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$
             type: string
           namespace_selector:
+            description: NamespaceSelector selects the namespaces to scan
+              images.
             type: string
           clusterWide:
-            type: string
-          policyreport:
-            type: string
+            description: Selector for cluster wide scan.
+            type: boolean
+          integrations:
+            type: object
+            policyreport:
+              description: Selector to enable policy report object creation
+                and integration wit plicy-reporter.
+              type: boolean
           image_pull_secrets:
+            description: List of image pull secret names in the operator's
+              namespace for image pulls.
             type: array
             items:
               type: string

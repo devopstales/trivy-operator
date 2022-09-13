@@ -73,7 +73,8 @@ namespaceScanner:
   crontab: "*/5 * * * *"
   namespaceSelector: "trivy-scan"
   clusterWide: false
-  policyreport: false
+  integrations:
+    policyreport: false
 
 admissionController:
   enabled: false

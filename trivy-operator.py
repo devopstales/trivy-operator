@@ -157,7 +157,7 @@ async def create_fn( logger, spec, **kwargs):
         clusterWide = False
 
     try:
-        policyreport = var_test(spec['policyreport'])
+        policyreport = var_test(spec['integrations']['policyreport'])
         logger.debug("namespace-scanners - policyreport:") # debuglog
         logger.debug(format(policyreport)) # debuglog
     except:
