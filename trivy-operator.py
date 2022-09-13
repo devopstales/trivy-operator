@@ -8,7 +8,7 @@ from typing import AsyncIterator, Optional, Tuple, Collection
 from datetime import datetime
 from OpenSSL import crypto
 from datetime import datetime, timezone
-import logging, uuid
+import logging, uuid, requests
 
 #############################################################################
 # ToDo
