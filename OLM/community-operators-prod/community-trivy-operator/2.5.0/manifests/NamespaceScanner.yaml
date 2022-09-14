@@ -2,6 +2,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: namespace-scanners.trivy-operator.devopstales.io
+  labels:
+    app.kubernetes.io/managed-by: trivy-operator
 spec:
   conversion:
     strategy: None
@@ -49,6 +51,18 @@ spec:
               description: Selector to enable policy report object creation
                 and integration wit plicy-reporter.
               type: boolean
+            defectdojo:
+              description: DefectDojo integration options
+              type: object
+              host:
+                description: URL of the DefectDojo server.
+                type: string
+              api_key:
+                description: Api key for DefectDojo api authentication.
+                type: string
+              k8s-cluster-name:
+                description: Name of the Kubernetes Cluster in defectdojo.
+                type: string
           image_pull_secrets:
             description: List of image pull secret names in the operator's
               namespace for image pulls.
@@ -64,5 +78,3 @@ spec:
         type: object
     served: true
     storage: true
-    subresources:
-      status: {}
