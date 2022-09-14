@@ -45,19 +45,20 @@ spec:
             type: boolean
           integrations:
             type: object
-            policyreport:
-              description: Selector to enable policy report object creation
-                and integration wit plicy-reporter.
-              type: boolean
-            defectdojo:
-              description: DefectDojo integration options
-              type: object
-              host:
-                description: URL of the DefectDojo server.
-                type: string
-              api_key:
-                description: Api key for DefectDojo api authentication.
-                type: string
+            properties:
+              policyreport:
+                description: Selector to enable policy report object creation
+                  and integration wit plicy-reporter.
+                type: boolean
+              defectdojo:
+                type: object
+                properties:
+                  host:
+                    description: URL of the DefectDojo server.
+                    type: string
+                  api_key:
+                    description: Api key for DefectDojo api authentication.
+                    type: string
           image_pull_secrets:
             description: List of image pull secret names in the operator's
               namespace for image pulls.
@@ -148,18 +149,20 @@ spec:
               - rke2-cis-1.23-permissive
           integrations:
             type: object
-            defectdojo:
-              description: DefectDojo integration options
-              type: object
-              host:
-                description: URL of the DefectDojo server.
-                type: string
-              api_key:
-                description: Api key for DefectDojo api authentication.
-                type: string
-              k8s-cluster-name:
-                description: Name of the Kubernetes Cluster in defectdojo.
-                type: string
+            properties:
+              defectdojo:
+                description: DefectDojo integration options
+                type: object
+                properties:
+                  host:
+                    description: URL of the DefectDojo server.
+                    type: string
+                  api_key:
+                    description: Api key for DefectDojo api authentication.
+                    type: string
+                  k8s-cluster-name:
+                    description: Name of the Kubernetes Cluster in defectdojo.
+                    type: string
           spec:
             type: object
             x-kubernetes-preserve-unknown-fields: true
