@@ -32,3 +32,22 @@ spec:
       targetPort: 8443
       protocol: TCP
       port: 443
+{{- if .Values.clusterScanner.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kube-bench-scnner
+    {{- include "trivy-operator.labels" . | nindent 4 }}
+  name: kube-bench-scnner
+spec:
+  selector:
+    app: kube-bench-scnner
+    {{- include "trivy-operator.labels" . | nindent 4 }}
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 9115
+      targetPort: 9115
+{{- end }}

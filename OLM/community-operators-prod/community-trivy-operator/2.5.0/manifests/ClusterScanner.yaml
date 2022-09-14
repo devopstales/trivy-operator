@@ -1,0 +1,99 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: cluster-scanners.trivy-operator.devopstales.io
+spec:
+  conversion:
+    strategy: None
+  group: trivy-operator.devopstales.io
+  names:
+    kind: ClusterScanner
+    listKind: ClusterScannerList
+    plural: cluster-scanners
+    shortNames:
+    - cs-scan
+    singular: cluster-scanner
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - description: Kubernetes Scan Profile
+      jsonPath: .spec.scanProfileName
+      name: ClusterScanProfile
+      type: string
+    - description: crontab value
+      jsonPath: .spec.crontab
+      name: Crontab
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          crontab:
+            pattern: ^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$
+            type: string
+          scanProfileName:
+            type: string
+            enum:
+              - ack-1.0
+              - aks-1.0
+              - gke-1.0
+              - gke-1.2.0
+              - eks-1.0.1
+              - cis-1.5
+              - cis-1.6
+              - cis-1.20
+              - cis-1.23
+              - rh-0.7
+              - rh-1.0
+              - k3s-cis-1.6-permissive
+              - k3s-cis-1.6-hardened
+              - k3s-cis-1.20-hardened
+              - k3s-cis-1.20-permissive
+              - k3s-cis-1.23-hardened
+              - k3s-cis-1.23-permissive
+              - rke-cis-1.4
+              - rke-cis-1.5-hardened
+              - rke-cis-1.5-permissive
+              - rke-cis-1.6-hardened
+              - rke-cis-1.6-permissive
+              - rke-cis-1.20-hardened
+              - rke-cis-1.20-permissive
+              - rke-cis-1.23-hardened
+              - rke-cis-1.23-permissive
+              - rke2-cis-1.5-hardened
+              - rke2-cis-1.5-permissive
+              - rke2-cis-1.6-hardened
+              - rke2-cis-1.6-permissive
+              - rke2-cis-1.20-hardened
+              - rke2-cis-1.20-permissive
+              - rke2-cis-1.23-hardened
+              - rke2-cis-1.23-permissive
+          integrations:
+            type: object
+            policyreport:
+              description: Selector to enable policy report object creation
+                and integration wit plicy-reporter.
+              type: boolean
+            defectdojo:
+              description: DefectDojo integration options
+              type: object
+              host:
+                description: URL of the DefectDojo server.
+                type: string
+              api_key:
+                description: Api key for DefectDojo api authentication.
+                type: string
+              k8s-cluster-name:
+                description: Name of the Kubernetes Cluster in defectdojo.
+                type: string
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

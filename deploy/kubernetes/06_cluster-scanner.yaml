@@ -4,3 +4,9 @@ metadata:
   name: main-config
 spec:
   crontab: "*/5 * * * *"
+  scanProfileName: "cis-1.23"
+  integrations:
+#    defectdojo:
+#      host: "https://defectdojo.k8s.intra"
+#      api_key: "xyz456ucdssd67sd67dsg"
+#      k8s-cluster-name: "eks-prod"
