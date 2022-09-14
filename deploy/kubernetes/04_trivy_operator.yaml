@@ -21,7 +21,7 @@ spec:
           fsGroupChangePolicy: "OnRootMismatch"
       serviceAccountName: trivy-operator
       containers:
-      - image: devopstales/trivy-operator:2.5-devel
+      - image: devopstales/trivy-operator:2.4
         imagePullPolicy: IfNotPresent
         name: trivy-operator
         env:
