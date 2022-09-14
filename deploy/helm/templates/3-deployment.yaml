@@ -82,3 +82,131 @@ spec:
         persistentVolumeClaim:
             claimName: {{ include "trivy-operator.fullname" . }}-trivy-cache
 {{- end }}
+{{- if .Values.clusterScanner.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: kube-bench-scnner
+    {{- include "trivy-operator.labels" . | nindent 4 }}
+  name: {{ include "kube-bench-scnner.fullname" . }}
+spec:
+  selector:
+    matchLabels:
+      app: kube-bench-scnner
+      {{- include "trivy-operator.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: kube-bench-scnner
+        {{- include "trivy-operator.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/port: "9115"
+        prometheus.io/scrape: "true"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      serviceAccountName: {{ include "trivy-operator.serviceAccountName" . }}
+      hostPID: true
+      containers:
+      - image: "{{ .Values.kube_bench_scnner.image.repository }}:{{ .Values.kube_bench_scnner.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.kube_bench_scnner.image.pullPolicy }}
+        env:
+        - name: TZ
+          value: {{ .Values.TimeZone }}
+{{- if or (eq .Values.log_level "DEBUG") (eq .Values.log_level "HIGH") }}
+        - name: VERBOSE_LOG
+          value: "True"
+{{- end }}
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+          - name: var-lib-etcd
+            mountPath: /var/lib/etcd
+            readOnly: true
+          - name: var-lib-kubelet
+            mountPath: /var/lib/kubelet
+            readOnly: true
+          - name: var-lib-kube-scheduler
+            mountPath: /var/lib/kube-scheduler
+            readOnly: true
+          - name: var-lib-kube-controller-manager
+            mountPath: /var/lib/kube-controller-manager
+            readOnly: true
+          - name: etc-systemd
+            mountPath: /etc/systemd
+            readOnly: true
+          - name: lib-systemd
+            mountPath: /lib/systemd/
+            readOnly: true
+          - name: srv-kubernetes
+            mountPath: /srv/kubernetes/
+            readOnly: true
+          - name: etc-kubernetes
+            mountPath: /etc/kubernetes
+            readOnly: true
+          - name: usr-bin
+            mountPath: /usr/local/mount-from-host/bin
+            readOnly: true
+          - name: etc-cni-netd
+            mountPath: /etc/cni/net.d/
+            readOnly: true
+          - name: opt-cni-bin
+            mountPath: /opt/cni/bin/
+            readOnly: true
+          - name: etc-passwd
+            mountPath: /etc/passwd
+            readOnly: true
+          - name: etc-group
+            mountPath: /etc/group
+            readOnly: true
+        ports:
+          - containerPort: 9115
+      volumes:
+        - name: var-lib-etcd
+          hostPath:
+            path: "/var/lib/etcd"
+        - name: var-lib-kubelet
+          hostPath:
+            path: "/var/lib/kubelet"
+        - name: var-lib-kube-scheduler
+          hostPath:
+            path: "/var/lib/kube-scheduler"
+        - name: var-lib-kube-controller-manager
+          hostPath:
+            path: "/var/lib/kube-controller-manager"
+        - name: etc-systemd
+          hostPath:
+            path: "/etc/systemd"
+        - name: lib-systemd
+          hostPath:
+            path: "/lib/systemd"
+        - name: srv-kubernetes
+          hostPath:
+            path: "/srv/kubernetes"
+        - name: etc-kubernetes
+          hostPath:
+            path: "/etc/kubernetes"
+        - name: usr-bin
+          hostPath:
+            path: "/usr/bin"
+        - name: etc-cni-netd
+          hostPath:
+            path: "/etc/cni/net.d/"
+        - name: opt-cni-bin
+          hostPath:
+            path: "/opt/cni/bin/"
+        - name: etc-passwd
+          hostPath:
+            path: "/etc/passwd"
+        - name: etc-group
+          hostPath:
+            path: "/etc/group"
+{{- end }}

@@ -146,6 +146,20 @@ spec:
               - rke2-cis-1.20-permissive
               - rke2-cis-1.23-hardened
               - rke2-cis-1.23-permissive
+          integrations:
+            type: object
+            defectdojo:
+              description: DefectDojo integration options
+              type: object
+              host:
+                description: URL of the DefectDojo server.
+                type: string
+              api_key:
+                description: Api key for DefectDojo api authentication.
+                type: string
+              k8s-cluster-name:
+                description: Name of the Kubernetes Cluster in defectdojo.
+                type: string
           spec:
             type: object
             x-kubernetes-preserve-unknown-fields: true

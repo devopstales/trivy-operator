@@ -13,6 +13,11 @@ spec:
   {{- if .Values.namespaceScanner.integrations.policyreport }}
     policyreport: {{ .Values.namespaceScanner.integrations.policyreport | default "false" }}
   {{- end }}
+  {{- if .Values.namespaceScanner.integrations.defectdojo }}
+  {{- with .Values.namespaceScanner.integrations.defectdojo }}
+    defectdojo:
+  {{- toYaml . | nindent 6 }}
+  {{- end }}
   {{- end }}
   {{- if .Values.registryAuth.enabled }}
   {{- if .Values.registryAuth.image_pull_secrets }}

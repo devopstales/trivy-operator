@@ -1,15 +1,11 @@
 from genericpath import exists
-import kopf
+import kopf, prometheus_client
 import kubernetes.client as k8s_client
 import kubernetes.config as k8s_config
 from kubernetes.client.rest import ApiException
 import logging
-import asyncio
-import pycron
-import os
-import subprocess
-import json
-import prometheus_client
+import asyncio, pycron
+import os, subprocess, json, datetime, requests
 
 #############################################################################
 # ToDo
@@ -52,7 +48,6 @@ CIS_VULN = prometheus_client.Gauge(
 )
 
 """Start Prometheus Exporter"""
-
 @kopf.on.startup()
 async def startup_fn_prometheus_client(logger, **kwargs):
     prometheus_client.start_http_server(9115)
@@ -66,6 +61,9 @@ async def startup_fn_prometheus_client(logger, **kwargs):
 @kopf.on.create('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
 async def startup_sc( logger, spec, **kwargs):
     logger.info("ClustereScanner Created")
+    defectdojo_host = None
+    defectdojo_api_key = None
+    k8s_cluster = None
 
     try:
         NODE_NAME = os.environ.get("NODE_NAME")
@@ -86,6 +84,17 @@ async def startup_sc( logger, spec, **kwargs):
     except:
         logger.error("cluster-scanner: crontab must be set !!!")
         raise kopf.PermanentError("cluster-scanner: crontab must be set")
+
+    try:
+        defectdojo_host = spec['integrations']['defectdojo']['host']
+        defectdojo_api_key = spec['integrations']['defectdojo']['api_key']
+        k8s_cluster = spec['integrations']['defectdojo']['k8s-cluster-name']
+        logger.debug("namespace-scanners integrations - defectdojo:") # debuglog
+        logger.debug("host: " % format(defectdojo_host)) # debuglog
+        logger.debug("api_key: " % format(defectdojo_api_key)) # debuglog
+        logger.debug("k8s_cluster: " % format(k8s_cluster)) # debuglog
+    except:
+        logger.info("defectdojo integration is not set")
 
     try:
         scan_profile = spec['scanProfileName']
@@ -169,6 +178,53 @@ async def startup_sc( logger, spec, **kwargs):
                 raise kopf.PermanentError("kube-bench run failed !!!")
             elif output:
                 bench_result = json.loads(output.decode("UTF-8"))
+                """DefectDojo Integration"""
+                logging.captureWarnings(True)
+                if defectdojo_host is not None and defectdojo_api_key is not None and k8s_cluster is not None:
+                    DEFECTDOJO_AUTH_TOKEN = "Token " + defectdojo_api_key
+
+                    headers = dict()
+                    headers['Authorization'] = DEFECTDOJO_AUTH_TOKEN
+                    files = {
+                        'file': output.decode("UTF-8")
+                    }
+                    data = {
+                        'scan_date': datetime.now().strftime("%Y-%m-%d"),
+                        'active': True,
+                        'verified': False,
+                        'scan_type': "kube-bench Scan",
+                        'product_type_name': "Kubernetes Cluster",
+                        'product_name': k8s_cluster,
+                        'engagement_name': NODE_NAME,
+                        'version': scan_profile,
+                        'auto_create_context': True,
+                        'close_old_findings': True,
+                    }
+                    response = requests.post(defectdojo_host+"/api/v2/import-scan/", headers=headers, files=files, data=data, verify=False)
+                    if response.status_code == 201 :
+                        logger.info("Successfully uploaded the results to Defect Dojo")
+                    else:
+                        logger.info("Something went wrong, please debug " + str(response.text))
+                    """Add kubernetes node to Defect Dojo"""
+                    response = requests.get(defectdojo_host+"/api/v2/products/?name="+k8s_cluster, headers=headers, verify=False)
+                    response_body = json.loads(response.text)
+                    for item in response_body['results']:
+                        product = item['id']
+                    data = {
+                        "tags": [
+                            "Kubernetes"
+                        ],
+                        "host": NODE_NAME,
+                        "product": product,
+                    }
+                    response = requests.post(defectdojo_host+"/api/v2/endpoints/", headers=headers, data=data, verify=False)
+                    if response.status_code == 201 :
+                        logger.info("Successfully added host to Defect Dojo")
+                    else:
+                        if "already exists" in response.text:
+                            print()
+                        else:
+                            logger.info("Something went wrong, please debug " + str(response.text))
 
             ClusterPolicyReport = {
                 "apiVersion": "wgpolicyk8s.io/v1alpha2",

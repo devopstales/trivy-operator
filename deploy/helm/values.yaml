@@ -75,6 +75,26 @@ namespaceScanner:
   clusterWide: false
   integrations:
     policyreport: false
+#    defectdojo:
+#      host: "https://defectdojo.k8s.intra"
+#      api_key: "xyz456ucdssd67sd67dsg"
+#      k8s-cluster-name: "eks-prod"
+
+kube_bench_scnner:
+  image:
+    repository: devopstales/kube-bench-scnner
+    pullPolicy: Always
+    tag: "2.5"
+
+clusterScanner:
+  enabled: false
+  crontab: "*/1 * * * *"
+  scanProfileName: "cis-1.23"
+  integrations:
+#    defectdojo:
+#      host: "https://defectdojo.k8s.intra"
+#      api_key: "xyz456ucdssd67sd67dsg"
+#      k8s-cluster-name: "eks-prod"
 
 admissionController:
   enabled: false

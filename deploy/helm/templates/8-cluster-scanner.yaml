@@ -1,0 +1,22 @@
+{{- if .Values.clusterScanner.enabled }}
+apiVersion: trivy-operator.devopstales.io/v1
+kind: NamespaceScanner
+metadata:
+  name: {{ include "trivy-operator.fullname" . }}-main-config
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+spec:
+  crontab: "{{ .Values.clusterScanner.crontab }}"
+  {{- if .Values.clusterScanner.scanProfileName }}
+  scanProfileName: "{{ .Values.clusterScanner.scanProfileName }}"
+  {{- end }}
+  {{- if .Values.clusterScanner.integrations }}
+  integrations:
+  {{- if .Values.clusterScanner.integrations.defectdojo }}
+  {{- with .Values.clusterScanner.integrations.defectdojo }}
+    defectdojo:
+  {{- toYaml . | nindent 6 }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+{{- end }}
