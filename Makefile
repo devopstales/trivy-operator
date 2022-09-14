@@ -13,7 +13,7 @@ BENCH := $(shell curl --silent https://api.github.com/repos/aquasecurity/kube-be
 help:
 	@grep -E '[a-zA-Z\.\-]+:.*?@ .*$$' $(MAKEFILE_LIST)| tr -d '#'  | awk 'BEGIN {FS = ":.*?@ "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-#trivy:	@ download binaries
+#bins:	@ download binaries
 bins:
 	@if [ ! -f /tmp/trivy ]; then \
 		echo "Get Trivy Version:"; \
@@ -32,25 +32,25 @@ bins:
 	cp /tmp/trivy docker/trivy-operator/trivy
 	cp /tmp/kube-bench docker/kube-bench-scnner/kube-bench
 
-#to-devel:	@ Build local trivy-operator devel image with kim
+#to-devel:	@ Build local trivy-operator devel image with nerdctl
 to-devel:
 	cp trivy-operator.py docker/trivy-operator/trivy-operator.py
-	kim build --tag devopstales/trivy-operator:$(VERSION)-devel docker/trivy-operator
+	nerdctl --namespace k8s.io build --tag devopstales/trivy-operator:$(VERSION)-devel docker/trivy-operator
 	rm -f docker/trivy-operator/trivy-operator.py
 
-#to-devel-delete:	@ Delete local trivy-operator dev image with kim
+#to-devel-delete:	@ Delete local trivy-operator dev image with nerdctl
 to-devel-delete:
-	kim image ls | grep devopstales | grep trivy-operator | grep $(VERSION)-devel | awk '{print "kim rmi "$$3}' | bash
+	nerdctl --namespace k8s.io image ls | grep devopstales | grep trivy-operator | grep $(VERSION)-devel | awk '{print "nerdctl --namespace k8s.io rmi "$$3}' | bash
 
-#kbs-devel:	@ Build local kube-bench-scnner devel image with kim
+#kbs-devel:	@ Build local kube-bench-scnner devel image with nerdctl
 kbs-devel:
 	cp kube-bench-scnner.py docker/kube-bench-scnner/kube-bench-scnner.py
-	kim build --tag devopstales/kube-bench-scnner:$(VERSION)-devel docker/kube-bench-scnner
+	nerdctl --namespace k8s.io build --tag devopstales/kube-bench-scnner:$(VERSION)-devel docker/kube-bench-scnner
 	rm -f docker/kube-bench-scnner/kube-bench-scnner.py
 
-#kbs-devel-delete:	@ Delete local kube-bench-scnner dev image with kim
+#kbs-devel-delete:	@ Delete local kube-bench-scnner dev image with nerdctl
 kbs-devel-delete:
-	kim image ls | grep devopstales | grep kube-bench-scnner | grep $(VERSION)-devel | awk '{print "kim rmi "$$3}' | bash
+	nerdctl --namespace k8s.io image ls | grep devopstales | grep kube-bench-scnner | grep $(VERSION)-devel | awk '{print "nerdctl --namespace k8s.io rmi "$$3}' | bash
 
 version:
 	cp trivy-operator.py docker/trivy-operator.py
