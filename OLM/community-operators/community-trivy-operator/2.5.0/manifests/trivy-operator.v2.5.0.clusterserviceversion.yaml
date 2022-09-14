@@ -20,8 +20,18 @@ metadata:
           "spec": {
             "crontab": "*/5 * * * *",
             "namespace_selector": "trivy-scan",
-            "clusterWide": "False",
-            "policyreport": "False",
+            "clusterWide": False,
+            "policyreport": False,
+            "integrations": {
+              "policyreport": True,
+              "defectdojo": {
+                "host": "https://defectdojo.k8s.intra",
+                "api_key": "xyz456ucdssd67sd67dsg",
+              },
+            },
+            "image_pull_secrets": [
+              "devopstales-dockerhub"
+            ],
             "registry": [
               {
                 "name": "docker.io",
@@ -29,6 +39,24 @@ metadata:
                 "password": ""
               }
             ]
+          }
+        },
+        {
+          "apiVersion": "trivy-operator.devopstales.io/v1",
+          "kind": "ClusterScanner",
+          "metadata": {
+            "name": "kube-bench-scnner-main-config"
+          },
+          "spec": {
+            "crontab": "*/5 * * * *",
+            "scanProfileName": "cis-1.23"
+            "integrations": {
+              "policyreport": True,
+              "defectdojo": {
+                "host": "https://defectdojo.k8s.intra",
+                "api_key": "xyz456ucdssd67sd67dsg",
+              }
+            }
           }
         }
       ]
@@ -42,6 +70,11 @@ spec:
       version: v1
       displayName: NamespaceScanner
       description: Confifuration for trivy-operator.
+    - kind: ClusterScanner
+      name: cluster-scanners.trivy-operator.devopstales.io
+      version: v1
+      displayName: ClusterScanner
+      description: Confifuration for trivy-operator's kube-bench-scnner.
     - kind: VulnerabilityReport
       name: vulnerabilityreports.trivy-operator.devopstales.io
       version: v1
@@ -157,6 +190,7 @@ spec:
     Add the PolicyReport CRDs to your cluster (v1alpha2):
     ```bash
     kubectl create -f https://github.com/kubernetes-sigs/wg-policy-prototypes/raw/master/policy-report/crd/v1alpha2/wgpolicyk8s.io_policyreports.yaml
+    kubectl create -f https://github.com/kubernetes-sigs/wg-policy-prototypes/raw/master/policy-report/crd/v1alpha2/wgpolicyk8s.io_clusterpolicyreports.yaml
     ```
 
     You can enable the Policy Report creatin by setting the `policyreport` to `True` in the NamespaceScanner object.

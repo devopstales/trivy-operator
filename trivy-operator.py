@@ -134,6 +134,7 @@ async def create_fn( logger, spec, **kwargs):
     defectdojo_host = None
     defectdojo_api_key = None
 
+
     if IN_CLUSTER:
         k8s_config.load_incluster_config()
     else:
@@ -166,14 +167,13 @@ async def create_fn( logger, spec, **kwargs):
         policyreport = False
 
     try:
-        defectdojo_host = var_test(spec['integrations']['defectdojo']['host'])
-        defectdojo_api_key = var_test(spec['integrations']['defectdojo']['api_key'])
+        defectdojo_host = spec['integrations']['defectdojo']['host']
+        defectdojo_api_key = spec['integrations']['defectdojo']['api_key']
         logger.debug("namespace-scanners integrations - defectdojo:") # debuglog
         logger.debug("host: " % format(defectdojo_host)) # debuglog
         logger.debug("api_key: " % format(defectdojo_api_key)) # debuglog
     except:
         logger.info("defectdojo integration is not set")
-        policyreport = False
 
     try:
         namespaceSelector = spec['namespace_selector']
@@ -503,7 +503,6 @@ async def create_fn( logger, spec, **kwargs):
                     trivy_result_list[image_name] = trivy_result
                     """DefectDojo Integration"""
                     if defectdojo_host is not None and defectdojo_api_key is not None:
-                        DEFECTDOJO_SCAN_URL = defectdojo_host + "/api/v2" + "/import-scan/"
                         DEFECTDOJO_AUTH_TOKEN = "Token " + defectdojo_api_key
                         image_tag = image.split(':')[1]
 
@@ -515,17 +514,21 @@ async def create_fn( logger, spec, **kwargs):
                         body = {
                             'scan_date': datetime.now().strftime("%Y-%m-%d"),
                             'active': True,
-                            'close_old_findings': 'true', # set the findings that are not present anymore to "inactive/mitigated"
-                            "skip_duplicates": 'true',
+                            'verified': False,
                             'scan_type': "Trivy Scan",
                             'product_type_name': "Container Image",
                             'product_name': image_name,
-                            'version': image_tag,
                             'engagement_name': "trivy-operator",
+                            'version': image_tag,
                             'auto_create_context': True, 
+                            'close_old_findings': True, # set the findings that are not present anymore to "inactive/mitigated"
                         }
 
-                        response = requests.post(DEFECTDOJO_SCAN_URL, headers=headers, files=files, data=body, verify=False)
+                        response = requests.post(defectdojo_host+"/api/v2/import-scan/", headers=headers, files=files, data=body, verify=False)
+                        if response.status_code == 201 :
+                                logger.info("Successfully uploaded the results to DefectDojo")
+                        else:
+                                logger.info("Something went wrong wit push to DefectDojo, please debug " + str(response.text))
 
             logger.info("image list end:")
 
