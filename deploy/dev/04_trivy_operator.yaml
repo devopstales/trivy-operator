@@ -35,6 +35,10 @@ spec:
           value: "True"
         - name: REDIS_BACKEND
           value: "redis://trivy-cache:6379"
+        - name: SKIP_DB_UPDATE
+          value: "true"
+#        - name: ADMISSION_CONTROLLER
+#          value: "true"
 #        - name: GITHUB_TOKEN
 #          value: MY-TOKEN-FROM-GITHUB
         volumeMounts:
