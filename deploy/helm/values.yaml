@@ -21,6 +21,7 @@ serviceAccount:
 # Dont try to download trivy db, run in air-gapped env:
 offline:
   enabled: false
+#  db_repository: localhost:5000/trivy-db
 
 cache:
   enabled: false

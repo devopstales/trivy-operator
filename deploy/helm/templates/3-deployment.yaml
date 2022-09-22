@@ -63,6 +63,10 @@ spec:
 {{- if .Values.offline.enabled }}
         - name: SKIP_DB_UPDATE
           value: "true"
+{{- if .Values.offline.db_repository }}
+        - name: DB_REPOSITORY
+          value: "{{ .Values.offline.db_repository }}"
+{{- end }}
 {{- end }}
 {{- if .Values.persistence.enabled }}
         volumeMounts:
