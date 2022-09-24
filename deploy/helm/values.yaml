@@ -108,7 +108,7 @@ registryAuth:
 ## you want to use from the operator namespace for image pulls
 #  registry:
 #  - name: docker.io
-#    user: "user"
+#    username: "user"
 #    password: "password"
 
 githubToken:

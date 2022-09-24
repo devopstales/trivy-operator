@@ -15,6 +15,6 @@ spec:
     - devopstales-dockerhub
 #  registry:
 #  - name: docker.io
-#    user: "devopstales"
+#    username: "devopstales"
 #    password: ""
 #    insecure: True 
