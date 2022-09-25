@@ -2,22 +2,13 @@ import kopf, prometheus_client
 import kubernetes.client as k8s_client
 import kubernetes.config as k8s_config
 from kubernetes.client.rest import ApiException
-import logging
-import prometheus_client
-#import asyncio
-#import pycron
+#import asyncio, pycron
 from croniter import croniter
 from datetime import datetime, timedelta, timezone
 import time
-import os
-import sys
-import subprocess
-import json
-import validators
-import base64
+import os, six, json, subprocess, validators, base64
 from typing import AsyncIterator, Optional, Tuple, Collection
 from OpenSSL import crypto
-from datetime import datetime, timezone
 import logging, uuid, requests
 
 #############################################################################
@@ -85,19 +76,6 @@ if OFFLINE_ENABLED:
     else:
         TRIVY_OFFLINE = ["--skip-db-update", "--offline-scan", "--db-repository", DB_REPOSITORY]
 
-
-def var_test(var):
-    if isinstance(var, bool):
-        resp = var
-    elif isinstance(var, six.string_types):
-        if var.lower() in ['true']:
-            resp = True
-        else:
-            resp = False
-    else:
-        resp = False
-    return resp
-
 #############################################################################
 # Pretasks
 #############################################################################
@@ -119,12 +97,21 @@ def sleepTillTopOfNextMinute():
     sleeptime = 60 - (t.second + t.microsecond/1000000.0)
     time.sleep(sleeptime)
 
-def str2bool(v):
-  return v in ("yes", "true", "t", "1", "True", True)
-
 def getCurretnTime():
   now = datetime.now().time() # time object
   return now
+
+def var_test(var):
+    if isinstance(var, bool):
+        resp = var
+    elif isinstance(var, six.string_types):
+        if var.lower() in ['true']:
+            resp = True
+        else:
+            resp = False
+    else:
+        resp = False
+    return resp
 
 """Download trivy cache """
 @kopf.on.startup()
@@ -598,7 +585,7 @@ async def create_fn( logger, spec, **kwargs):
                 docker_tag = image_name.split(':')[-1]
 
                 trivy_result = trivy_result_list[image_name]
-                logger.debug(trivy_result) # debug
+                #logger.debug(trivy_result) # debug
                 vul_report[pod_name] = []
                 policy_report[pod_name] = []
                 if list(trivy_result.keys())[0] == "ERROR":
