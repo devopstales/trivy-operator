@@ -85,14 +85,16 @@ if OFFLINE_ENABLED:
 
 
 def var_test(var):
-  if isinstance(var, six.string_types):
-    if var.lower() in ['true']:
-      resp = True
+    if isinstance(var, bool):
+        resp = var
+    elif isinstance(var, six.string_types):
+        if var.lower() in ['true']:
+            resp = True
+        else:
+            resp = False
     else:
-      resp = False
-  else:
-    resp = False
-  return resp
+        resp = False
+    return resp
 
 #############################################################################
 # Pretasks
@@ -165,6 +167,7 @@ async def create_fn( logger, spec, **kwargs):
 
     try:
         policyreport = var_test(spec['integrations']['policyreport'])
+        logger.info("policyreport integration is configured")
         logger.debug("namespace-scanners integrations - policyreport:") # debuglog
         logger.debug(format(policyreport)) # debuglog
     except:
@@ -174,6 +177,7 @@ async def create_fn( logger, spec, **kwargs):
     try:
         defectdojo_host = spec['integrations']['defectdojo']['host']
         defectdojo_api_key = spec['integrations']['defectdojo']['api_key']
+        logger.info("defectdojo integration is configured")
         logger.debug("namespace-scanners integrations - defectdojo:") # debuglog
         logger.debug("host: " % format(defectdojo_host)) # debuglog
         logger.debug("api_key: " % format(defectdojo_api_key)) # debuglog
@@ -213,8 +217,9 @@ async def create_fn( logger, spec, **kwargs):
                 data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
                 registry_list.append(data['auths'])
                 logger.debug(format(data['auths'])) # debuglog
-            except:
+            except ApiException as e:
                 logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
+                logger.debug("Exception when calling CoreV1Api->read_namespaced_secret: %s\n" % e) # debuglog
 
     if secret_names_present:
         pull_secret_decoder(secret_names, current_namespace)
@@ -238,7 +243,7 @@ async def create_fn( logger, spec, **kwargs):
             if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
                 logger.info("VulnerabilityReport %s already exists!!!" % name)
             else:
-                print("Exception when creating VulnerabilityReport - %s : %s\n" % (name, e))
+                logger.error("Exception when creating VulnerabilityReport - %s : %s\n" % (name, e))
 
     """Test VulnerabilityReport"""
     def get_vulnerabilityreports(namespace, name):
@@ -255,7 +260,7 @@ async def create_fn( logger, spec, **kwargs):
             return True
         except ApiException as e:
             if e.status != 404:
-                print("Exception when testing VulnerabilityReport - %s : %s\n" % (name, e))
+                logger.error("Exception when testing VulnerabilityReport - %s : %s\n" % (name, e))
                 return False
             else:
                 return False
@@ -271,7 +276,7 @@ async def create_fn( logger, spec, **kwargs):
             api_response = api_instance.delete_namespaced_custom_object(
                 group, version, namespace, plural, name)
         except ApiException as e:
-            print("Exception when deleting VulnerabilityReport - %s : %s\n" % (name, e))
+            logger.error("Exception when deleting VulnerabilityReport - %s : %s\n" % (name, e))
 
     """Test policyReport"""
     def get_policyreports(namespace, name):
@@ -288,7 +293,7 @@ async def create_fn( logger, spec, **kwargs):
             return True
         except ApiException as e:
             if e.status != 404:
-                print("Exception when testing policyReport - %s : %s\n" % (name, e))
+                logger.error("Exception when testing policyReport - %s : %s\n" % (name, e))
                 return False
             else:
                 return False
@@ -312,7 +317,7 @@ async def create_fn( logger, spec, **kwargs):
             if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
                 logger.info("policyReport %s already exists!!!" % name)
             else:
-                print("Exception when creating policyReport - %s : %s\n" % (name, e))
+                logger.error("Exception when creating policyReport - %s : %s\n" % (name, e))
 
     """Delete policyReport"""
     def delete_policyreports(namespace, name):
@@ -325,7 +330,7 @@ async def create_fn( logger, spec, **kwargs):
             api_response = api_instance.delete_namespaced_custom_object(
                 group, version, namespace, plural, name)
         except ApiException as e:
-            print("Exception when deleting policyReport - %s : %s\n" % (name, e))
+            logger.error("Exception when deleting policyReport - %s : %s\n" % (name, e))
 
     ############################################
     # start crontab
@@ -460,7 +465,7 @@ async def create_fn( logger, spec, **kwargs):
                     TRIVY = TRIVY + TRIVY_REDIS
                 if OFFLINE_ENABLED:
                     TRIVY = TRIVY + TRIVY_OFFLINE
-                TRIVY = TRIVY + image_name
+                TRIVY = TRIVY + [image_name]
                 # --ignore-policy trivy.rego
 
                 res = subprocess.Popen(
@@ -708,7 +713,6 @@ async def create_fn( logger, spec, **kwargs):
                         logger.debug(vul_report[pod_name]) # debuglog
                         logger.debug(vul_list[pod_name]) # debuglog
                     elif 'Results' in trivy_result and 'Vulnerabilities' not in trivy_result['Results'][0]:
-                        # For Alpine Linux
                         vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
                                 "CRITICAL": 0, "ERROR": 0,
@@ -727,7 +731,6 @@ async def create_fn( logger, spec, **kwargs):
                             "category": "Vulnerability Scan",
                             "message": "There ins no vulnerability in this image",
                             "policy": "Image Vulnerability",
-                            "rule": item["VulnerabilityID"],
                             "properties": {
                                 "registry.server": docker_registry,
                                 "artifact.repository": docker_image,
@@ -790,10 +793,10 @@ async def create_fn( logger, spec, **kwargs):
                 vr_name += pod_name.split('_')[1]
                 # pod-[nginx]-container-[init]
 
-                MyLogger.info("Generate VR begin:") # DEBUG!
-                MyLogger.info(pod_name) # DEBUG!
-                logger.debug(vul_list[pod_name]) # debug
-                MyLogger.info("Generate VR end:") # DEBUG!
+                logger.debug("Generate VR begin:")  # DEBUG!
+                logger.debug("Creatting VR for %s" % pod_name) # DEBUG!
+                logger.debug(vul_list[pod_name]) # DEBUG!
+                logger.debug("Generate VR end:") # DEBUG!
 
                 vulnerabilityReport = {
                     "apiVersion": "trivy-operator.devopstales.io/v1",
@@ -883,6 +886,7 @@ async def create_fn( logger, spec, **kwargs):
                 else:
                     create_vulnerabilityreports(vulnerabilityReport, namespace, vr_name)
 
+                logger.debug("Generate PR begin:")
                 if policyreport:
                     is_policyreports_exists = get_policyreports(namespace, pr_name)
                     MyLogger.info("DEBUG - is_policyreports_exists: %s" % is_policyreports_exists) # WARNING
@@ -892,7 +896,9 @@ async def create_fn( logger, spec, **kwargs):
                         delete_policyreports(namespace, pr_name)
                         create_policyreports(policyReport, namespace, pr_name)
                     else:
+                        logger.error("policyreport dose not exists")
                         create_policyreports(policyReport, namespace, pr_name)
+                logger.debug("Generate PR end:")
 
 
             """Generate Metricfile"""
@@ -1135,8 +1141,9 @@ if AC_ENABLED:
                             data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
                             registry_list.append(data['auths'])
                             logger.debug(format(data['auths'])) # debuglog
-                        except:
+                        except ApiException as e:
                             logger.error("%s secret dose not exist in namespace %s" % (secret_name, current_namespace))
+                            logger.debug("Exception when calling CoreV1Api->read_namespaced_secret: %s\n" % e) # debuglog
         except:
             logger.info("No ns-scan object created yet.")
 
@@ -1193,7 +1200,7 @@ if AC_ENABLED:
                 TRIVY = TRIVY + TRIVY_REDIS
             if OFFLINE_ENABLED:
                 TRIVY = TRIVY + TRIVY_OFFLINE
-            TRIVY = TRIVY + image_name
+            TRIVY = TRIVY + [image_name]
             # --ignore-policy trivy.rego
 
             res = subprocess.Popen(
@@ -1202,21 +1209,19 @@ if AC_ENABLED:
             if error:
                 """Error Logging"""
                 logger.error("TRIVY ERROR: return %s" % (res.returncode))
-                if b"401" in error.strip():
-                    logger.error(
-                        "Repository: Unauthorized authentication required")
+                if b"unknown tag" in error.strip():
+                    logger.error("Repository: No tag in registry")
+                elif b"401" in error.strip():
+                    logger.error("Repository: Unauthorized authentication required")
                 elif b"UNAUTHORIZED" in error.strip():
-                    logger.error(
-                        "Repository: Unauthorized authentication required")
+                    logger.error("Repository: Unauthorized authentication required")
                 elif b"You have reached your pull rate limit." in error.strip():
                     logger.error("You have reached your pull rate limit.")
                 elif b"unsupported MediaType" in error.strip():
                     logger.error(
                         "Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
-                elif b"MANIFEST_UNKNOWN: manifest unknown" in error.strip():
-                    logger.error("No tag in registry")
                 else:
-                    logger.error("%s" % (error.strip()))
+                    logger.error("%s" % str(error.strip().decode("utf-8")))
                 """Error action"""
                 se = {"ERROR": 1}
                 vul_list[image_name] = [se, namespace]
@@ -1271,51 +1276,6 @@ if AC_ENABLED:
 #############################################################################
 # ClustereScanner
 #############################################################################
-
-"""Test daemonset"""
-def test_daemonset_exists(namespace, name):
-    with k8s_client.ApiClient() as api_client:
-        api_instance = k8s_client.AppsV1Api(api_client)
-    try:
-        api_response = api_instance.read_namespaced_daemon_set(
-            name, namespace )
-        return True
-    except ApiException as e:
-        if e.status != 404:
-            print("Exception when testing daemonset - %s : %s\n" % (name, e))
-            return False
-        else:
-            return False
-
-"""Generate daemonset"""
-def create_daemonset(body, namespace, name):
-    with k8s_client.ApiClient() as api_client:
-        api_instance = k8s_client.AppsV1Api(api_client)
-        pretty = 'true'
-        field_manager = 'trivy-operator'
-        body = body
-        namespace = namespace
-    try:
-        api_response = api_instance.create_namespaced_daemon_set(
-            namespace, body, pretty=pretty,  field_manager=field_manager)
-    except ApiException as e:
-        if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
-            logger.info("daemonset %s already exists!!!" % name)
-        else:
-            print("Exception when creating daemonset - %s : %s\n" % (name, e))
-
-"""Delete daemonset"""
-def delete_daemonset(namespace, name):
-    with k8s_client.ApiClient() as api_client:
-        api_instance = k8s_client.AppsV1Api(api_client)
-    try:
-        api_response = api_instance.delete_namespaced_daemon_set(
-            name, namespace)
-    except ApiException as e:
-        print("Exception when deleting daemonset - %s : %s\n" % (name, e))
-
-#############################################################################
-
 @kopf.on.resume('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
 @kopf.on.create('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
 async def startup_sc_deployer( logger, spec, **kwargs):
@@ -1401,6 +1361,38 @@ async def startup_sc_deployer( logger, spec, **kwargs):
         { "name": "etc-group", "hostPath": { "path": "/etc/group" } },
     ]
 
+    """Test daemonset"""
+    def test_daemonset_exists(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.AppsV1Api(api_client)
+        try:
+            api_response = api_instance.read_namespaced_daemon_set(
+                name, namespace )
+            return True
+        except ApiException as e:
+            if e.status != 404:
+                logger.error("Exception when testing daemonset - %s : %s\n" % (name, e))
+                return False
+            else:
+                return False
+
+    """Generate daemonset"""
+    def create_daemonset(body, namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.AppsV1Api(api_client)
+            pretty = 'true'
+            field_manager = 'trivy-operator'
+            body = body
+            namespace = namespace
+        try:
+            api_response = api_instance.create_namespaced_daemon_set(
+                namespace, body, pretty=pretty,  field_manager=field_manager)
+        except ApiException as e:
+            if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
+                logger.info("daemonset %s already exists!!!" % name)
+            else:
+                logger.error("Exception when creating daemonset - %s : %s\n" % (name, e))
+
     is_daemonset_exists = test_daemonset_exists(namespace, ds_name)
 
     if is_daemonset_exists:
@@ -1412,6 +1404,32 @@ async def startup_sc_deployer( logger, spec, **kwargs):
 async def startup_sc_deleter( logger, spec, **kwargs):
     ds_name = "kube-bech-scanner"
     namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+
+    """Test daemonset"""
+    def test_daemonset_exists(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.AppsV1Api(api_client)
+        try:
+            api_response = api_instance.read_namespaced_daemon_set(
+                name, namespace )
+            return True
+        except ApiException as e:
+            if e.status != 404:
+                logger.error("Exception when testing daemonset - %s : %s\n" % (name, e))
+                return False
+            else:
+                return False
+
+    """Delete daemonset"""
+    def delete_daemonset(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.AppsV1Api(api_client)
+        try:
+            api_response = api_instance.delete_namespaced_daemon_set(
+                name, namespace)
+        except ApiException as e:
+            logger.error("Exception when deleting daemonset - %s : %s\n" % (name, e))
+
     is_daemonset_exists = test_daemonset_exists(namespace, ds_name)
 
     if is_daemonset_exists:
