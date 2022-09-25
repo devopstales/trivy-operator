@@ -16,8 +16,6 @@ spec:
         prometheus.io/port: "9115"
         prometheus.io/scrape: "true"
     spec:
-      nodeSelector:
-        node-role.kubernetes.io/builder: "true"
       securityContext:
           fsGroup: 10001
           fsGroupChangePolicy: "OnRootMismatch"
@@ -35,8 +33,8 @@ spec:
           value: "True"
         - name: REDIS_BACKEND
           value: "redis://trivy-cache:6379"
-        - name: SKIP_DB_UPDATE
-          value: "true"
+#        - name: SKIP_DB_UPDATE
+#          value: "true"
 #        - name: ADMISSION_CONTROLLER
 #          value: "true"
 #        - name: GITHUB_TOKEN
