@@ -1,5 +1,5 @@
 codeSHELL=/bin/bash -o pipefail
-export VERSION=2.5
+export VERSION=2.4
 
 .PHONY:	all
 all:	 trivy
@@ -7,14 +7,13 @@ all:	 trivy
 .DEFAULT_GOAL := help
 
 TRIVY := $(shell curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d "v" -f2)
-BENCH := $(shell curl --silent https://api.github.com/repos/aquasecurity/kube-bench/releases/latest | jq -r .name | cut -d "v" -f2)
 
 #help:	@ List available tasks on this project
 help:
 	@grep -E '[a-zA-Z\.\-]+:.*?@ .*$$' $(MAKEFILE_LIST)| tr -d '#'  | awk 'BEGIN {FS = ":.*?@ "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-#bins:	@ download binaries
-bins:
+#trivy:	@ download trivy binary
+trivy:
 	@if [ ! -f /tmp/trivy ]; then \
 		echo "Get Trivy Version:"; \
 		echo $(TRIVY); \
