@@ -1,6 +1,6 @@
 # Overview
 
-The trivy-operator uses CustomResourceDefinitions (CRDs). Theas are the fallowinf
+The trivy-operator uses CustomResourceDefinitions (CRDs). These are the fallowing
 
 | NAME                          | SHORTNAMES                                              | APIGROUP               | NAMESPACED |
 |-------------------------------|---------------------------------------------------------|------------------------|------------|

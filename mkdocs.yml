@@ -12,15 +12,20 @@ nav:
     - Installation: installation.md
     - Configuration: configuration.md
     - Functions:
+        - CIS Benchmark: functions/cis-benchmark.md
         - Admission Controller: functions/image-validator.md
+        - Air-Gapped Environment: functions/airgap-mode.md
     - Integrations:
         - Monitoring: integrations/monitoring.md
         - Policy Reporter: integrations/policy-reporter.md
+        - DefectDojo: integrations/defectdojo.md
     - Custom Resource Definitions:
         - Overview: crds/index.md
         - NamespaceScanner: crds/namespace-scanner.md
+        - ClusterScanner: crds/cluster-scanner.md
         - VulnerabilityReport: crds/vulnerability-report.md
         - PolicyReport: crds/policy-report.md
+        - ClusterPolicyReport: crds/cluster-policy-report.md
 
 
 theme:

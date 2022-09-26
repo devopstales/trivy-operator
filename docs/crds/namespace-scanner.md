@@ -1,8 +1,8 @@
 # NamespaceScanner
 
-The NamespaceScanner object is the main configuration object for the trivy-operator's vulnerabiliti scanns. 
+The NamespaceScanner Custom Resource is the main configuration object for the trivy-operator's vulnerability scans. 
 
-The following examle object is confihured to:
+The following example object is configured to:
 
 * run the vulnerability scan every hour (`crontab: '00 * * * *'`)
 * test only the namespaces wit the the `trivy-scan: "true"`
@@ -17,13 +17,22 @@ metadata:
 spec:
   crontab: '00 * * * *'
   namespace_selector: trivy-scan
+  clusterWide: "false"
+  integrations:
+    policyreport: True
+    defectdojo:
+      host: "https://defectdojo.rancher-desktop.intra"
+      api_key: "xyz456ucdssd67sd67dsg"
+  image_pull_secrets:
+  - devopstales-dockerhub
   registry:
-  - name: docker.io
+  - name: registry.rancher-desktop.intra
     user: "user"
     password: "password"
+    insecure: true
 ```
 
-The followin list show the NamespaceScanner objects listid by the kbectl cli:
+The following list show the NamespaceScanner objects listed by the kbectl cli:
 
 ```bash
 kubectl get ns-scan

@@ -1,5 +1,7 @@
 # DefectDojo
 
+DefectDojo is an Open-Source DevSecOps and vulnerability management tool. DefectDojo allows you to manage your application security program, maintain product and application information, triage vulnerabilities and push findings to systems like JIRA and Slack. DefectDojo enriches and refines vulnerability data using a number of heuristic algorithms that improve with the more you use the platform.
+
 ## Install with Helm chart
 
 ```bash
@@ -26,4 +28,18 @@ echo "DefectDojo admin password: $(kubectl \
   get secret defectdojo \
   --output jsonpath='{.data.DD_ADMIN_PASSWORD}' \
   | base64 --decode)"
+```
+
+Enable deduplication for findings:
+
+### Enable DefectDojo integration for trivy-operator
+
+To enable the DefectDojo integration for trivy-operator you need to enable it in the `NamespaceScanner` object:
+
+```yaml
+  integrations:
+    policyreport: True
+    defectdojo:
+      host: "https://defectdojo.rancher-desktop.intra"
+      api_key: "xyz456ucdssd67sd67dsg"
 ```
