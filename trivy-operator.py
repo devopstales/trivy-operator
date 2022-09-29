@@ -11,11 +11,23 @@ from typing import AsyncIterator, Optional, Tuple, Collection
 from OpenSSL import crypto
 import logging, uuid, requests
 
+def var_test(var):
+    if isinstance(var, bool):
+        resp = var
+    elif isinstance(var, six.string_types):
+        if var.lower() in ['true']:
+            resp = True
+        else:
+            resp = False
+    else:
+        resp = False
+    return resp
+
 #############################################################################
 # Logging
 #############################################################################
 
-VERBOSE_LOG = os.getenv("VERBOSE_LOG", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
+VERBOSE_LOG = var_test(os.getenv("VERBOSE_LOG", False))
 FORMAT = '[%(asctime)s] %(name)s         [VERBOSE_LOG] %(message)s'
 
 logging.basicConfig(format=FORMAT)
@@ -53,11 +65,12 @@ AC_VULN = prometheus_client.Gauge(
     'Admission Controller vulnerabilities',
     ['exported_namespace', 'image', 'severity']
 )
-IN_CLUSTER = os.getenv("IN_CLUSTER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
-IS_GLOBAL = os.getenv("IS_GLOBAL", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
-AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
-REDIS_ENABLED = os.getenv("REDIS_ENABLED", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
-OFFLINE_ENABLED = os.getenv("SKIP_DB_UPDATE", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
+IN_CLUSTER = var_test(os.getenv("IN_CLUSTER", False))
+IS_GLOBAL = var_test(os.getenv("IS_GLOBAL", False))
+AC_ENABLED = var_test(os.getenv("ADMISSION_CONTROLLER", False))
+REDIS_ENABLED = var_test(os.getenv("REDIS_ENABLED", False))
+OFFLINE_ENABLED = var_test(os.getenv("SKIP_DB_UPDATE", False))
+DB_REPOSITORY_INSECURE = var_test(os.getenv("DB_REPOSITORY_INSECURE", False))
 
 if REDIS_ENABLED:
     REDIS_BACKEND = os.getenv("REDIS_BACKEND")
@@ -74,7 +87,9 @@ if OFFLINE_ENABLED:
     if not DB_REPOSITORY:
         TRIVY_OFFLINE = ["--skip-db-update", "--offline-scan"]
     else:
-        TRIVY_OFFLINE = ["--skip-db-update", "--offline-scan", "--db-repository", DB_REPOSITORY]
+        TRIVY_OFFLINE = ["--db-repository", DB_REPOSITORY]
+        if DB_REPOSITORY_INSECURE:
+            os.environ['TRIVY_INSECURE'] = "true"
 
 #############################################################################
 # Pretasks
@@ -101,31 +116,27 @@ def getCurretnTime():
   now = datetime.now().time() # time object
   return now
 
-def var_test(var):
-    if isinstance(var, bool):
-        resp = var
-    elif isinstance(var, six.string_types):
-        if var.lower() in ['true']:
-            resp = True
-        else:
-            resp = False
-    else:
-        resp = False
-    return resp
-
 """Download trivy cache """
 @kopf.on.startup()
 async def startup_fn_trivy_cache(logger, **kwargs):
     if OFFLINE_ENABLED:
-        logger.info("Offline mode enabled, skipping cache update")
-        return
-    TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
-    if REDIS_ENABLED:
-      TRIVY_CACHE = TRIVY_CACHE + TRIVY_REDIS
-    trivy_cache_result = (
-        subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
-    )
-    logger.info("trivy cache created...")
+        if DB_REPOSITORY:
+            TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
+            TRIVY_CACHE = TRIVY_CACHE + ["--db-repository", DB_REPOSITORY]
+            trivy_cache_result = (
+                subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
+            )
+            logger.info("Offline mode enabled, trivy cache created...")
+        else:
+            logger.info("Offline mode enabled, skipping cache update")
+    else:
+        TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
+        if REDIS_ENABLED:
+            TRIVY_CACHE = TRIVY_CACHE + TRIVY_REDIS
+        trivy_cache_result = (
+            subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
+        )
+        logger.info("trivy cache created...")
 
 """Start Prometheus Exporter"""
 @kopf.on.startup()
@@ -534,7 +545,7 @@ async def create_fn( logger, spec, **kwargs):
                     """DefectDojo Integration"""
                     if defectdojo_host is not None and defectdojo_api_key is not None:
                         DEFECTDOJO_AUTH_TOKEN = "Token " + defectdojo_api_key
-                        image_tag = image.split(':')[1]
+                        image_tag = image_name.split(':')[1]
 
                         headers = dict()
                         headers['Authorization'] = DEFECTDOJO_AUTH_TOKEN
@@ -547,7 +558,7 @@ async def create_fn( logger, spec, **kwargs):
                             'verified': False,
                             'scan_type': "Trivy Scan",
                             'product_type_name': "Container Image",
-                            'product_name': image_name,
+                            'product_name': image_name.split(':')[0],
                             'engagement_name': "trivy-operator",
                             'version': image_tag,
                             'auto_create_context': True, 

@@ -15,13 +15,16 @@ rules:
   verbs:
     - create
 - apiGroups:
-    - "apps/v1"
+  - "admissionregistration.k8s.io"
   resources:
-    - DaemonSet
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
   verbs:
-    - get
-    - create
-    - delete
+  - create
+  - patch
+  - get
+  - watch
+  - list
 - apiGroups:
    - "wgpolicyk8s.io"
   resources:
@@ -55,9 +58,18 @@ rules:
   - cluster-scanners/status
   verbs:
   - get
+  - list
   - watch
   - list
   - patch
+- apiGroups:
+    - "apps"
+  resources:
+    - daemonsets
+  verbs:
+    - get
+    - create
+    - delete
 - apiGroups:
    - ""
   resources:
@@ -73,17 +85,6 @@ rules:
   - namespaces
   - secrets
   verbs:
-  - get
-  - watch
-  - list
-- apiGroups:
-  - "admissionregistration.k8s.io"
-  resources:
-  - mutatingwebhookconfigurations
-  - validatingwebhookconfigurations
-  verbs:
-  - create
-  - patch
   - get
   - watch
   - list

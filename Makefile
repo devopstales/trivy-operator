@@ -1,5 +1,5 @@
 codeSHELL=/bin/bash -o pipefail
-export VERSION=2.4
+export VERSION=2.5
 
 .PHONY:	all
 all:	 trivy
@@ -39,7 +39,8 @@ to-devel:
 
 #to-devel-delete:	@ Delete local trivy-operator dev image with nerdctl
 to-devel-delete:
-	nerdctl --namespace k8s.io image ls | grep devopstales | grep trivy-operator | grep $(VERSION)-devel | awk '{print "nerdctl --namespace k8s.io rmi "$$3}' | bash
+	#nerdctl --namespace k8s.io image ls | grep devopstales | grep trivy-operator | grep $(VERSION)-devel | awk '{print "nerdctl --namespace k8s.io rmi "$$3}' | bash
+	nerdctl --namespace k8s.io rmi devopstales/trivy-operator:$(VERSION)-devel
 
 #kbs-devel:	@ Build local kube-bench-scnner devel image with nerdctl
 kbs-devel:
@@ -49,7 +50,8 @@ kbs-devel:
 
 #kbs-devel-delete:	@ Delete local kube-bench-scnner dev image with nerdctl
 kbs-devel-delete:
-	nerdctl --namespace k8s.io image ls | grep devopstales | grep kube-bench-scnner | grep $(VERSION)-devel | awk '{print "nerdctl --namespace k8s.io rmi "$$3}' | bash
+	#nerdctl --namespace k8s.io image ls | grep devopstales | grep kube-bench-scnner | grep $(VERSION)-devel | awk '{print "nerdctl --namespace k8s.io rmi "$$3}' | bash
+	nerdctl --namespace k8s.io rmi devopstales/kube-bench-scnner:$(VERSION)-devel
 
 version:
 	cp trivy-operator.py docker/trivy-operator.py

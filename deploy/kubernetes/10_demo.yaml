@@ -21,7 +21,7 @@ spec:
     image: ubuntu:latest
     command: ['sh', '-c', 'echo The app is running! && sleep 10']
   containers:
-  - image: docker.rancher-decktop.intra/evopstales/demo:insecure
+  - image: docker.rancher-decktop.intra/devopstales/demo:insecure
     imagePullPolicy: IfNotPresent
     name: nginx
   - image: library/nginx:bad
