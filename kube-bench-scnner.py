@@ -4,8 +4,10 @@ import kubernetes.client as k8s_client
 import kubernetes.config as k8s_config
 from kubernetes.client.rest import ApiException
 import logging
-import asyncio, pycron
-import os, subprocess, json, datetime, requests
+#import asyncio, pycron
+from croniter import croniter
+from datetime import datetime, timedelta, timezone
+import os, subprocess, json, requests, time
 
 #############################################################################
 # ToDo
@@ -46,6 +48,28 @@ CIS_VULN = prometheus_client.Gauge(
     'Details of CIS benchmarks for cluster',
     ['hostname', 'scored', 'status', 'test_number', 'type']
 )
+
+# Round time down to the top of the previous minute
+def roundDownTime(dt=None, dateDelta=timedelta(minutes=1)):
+    roundTo = dateDelta.total_seconds()
+    if dt == None : dt = datetime.now()
+    seconds = (dt - dt.min).seconds
+    rounding = (seconds+roundTo/2) // roundTo * roundTo
+    return dt + timedelta(0,rounding-seconds,-dt.microsecond)
+
+# Get next run time from now, based on schedule specified by cron string
+def getNextCronRunTime(schedule):
+    return croniter(schedule, datetime.now()).get_next(datetime)
+
+# Sleep till the top of the next minute
+def sleepTillTopOfNextMinute():
+    t = datetime.utcnow()
+    sleeptime = 60 - (t.second + t.microsecond/1000000.0)
+    time.sleep(sleeptime)
+
+def getCurretnTime():
+  now = datetime.now().time() # time object
+  return now
 
 """Start Prometheus Exporter"""
 @kopf.on.startup()
@@ -89,10 +113,11 @@ async def startup_sc( logger, spec, **kwargs):
         defectdojo_host = spec['integrations']['defectdojo']['host']
         defectdojo_api_key = spec['integrations']['defectdojo']['api_key']
         k8s_cluster = spec['integrations']['defectdojo']['k8s-cluster-name']
+        logger.info("defectdojo integration is configured")
         logger.debug("namespace-scanners integrations - defectdojo:") # debuglog
-        logger.debug("host: " % format(defectdojo_host)) # debuglog
-        logger.debug("api_key: " % format(defectdojo_api_key)) # debuglog
-        logger.debug("k8s_cluster: " % format(k8s_cluster)) # debuglog
+        logger.debug("host: %s" % format(defectdojo_host)) # debuglog
+        logger.debug("api_key: %s" % format(defectdojo_api_key)) # debuglog
+        logger.debug("k8s_cluster: %s" % format(k8s_cluster)) # debuglog
     except:
         logger.info("defectdojo integration is not set")
 
@@ -167,8 +192,12 @@ async def startup_sc( logger, spec, **kwargs):
     # start crontab
     ############################################
 
+    nextRunTime = getNextCronRunTime(crontab)
     while True:
-        if pycron.is_now(crontab):
+#        if pycron.is_now(crontab):
+        roundedDownTime = roundDownTime()
+        if (roundedDownTime == nextRunTime):
+
             res = subprocess.Popen(
                 KUBE_BENCH_COMMAND, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output, error = res.communicate()
@@ -313,6 +342,12 @@ async def startup_sc( logger, spec, **kwargs):
             else:
                 create_clusterpolicyreports(ClusterPolicyReport, report_name)
 
-            await asyncio.sleep(15)
-        else:
-            await asyncio.sleep(15)
+        elif (roundedDownTime > nextRunTime):
+            # We missed an execution. Error. Re initialize.
+            now = getCurretnTime()
+            MyLogger.info("MISSED RUN: %s" % now) # WARNING
+            nextRunTime = getNextCronRunTime(crontab)
+        sleepTillTopOfNextMinute()
+#            await asyncio.sleep(15)
+#        else:
+#            await asyncio.sleep(15)

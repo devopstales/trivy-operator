@@ -14,7 +14,7 @@ RUN wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/s
     apk add --force-overwrite glibc-2.33-r0.apk && \
     mkdir /etc/kube-bench
 
-RUN pip3 install --no-cache-dir kopf kubernetes asyncio pycron prometheus_client
+RUN pip3 install --no-cache-dir kopf kubernetes croniter prometheus_client
 
 COPY kube-bench-scnner.py /kube-bench-scnner.py
 ADD ${ARCH}cfg /etc/kube-bench/cfg

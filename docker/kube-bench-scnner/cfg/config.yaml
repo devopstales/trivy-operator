@@ -266,7 +266,7 @@ version_mapping:
   "rke-1.19": "rke-cis-1.20-permissive"
   "rke-1.20": "rke-cis-1.20-permissive"
   "v1.18.10+rke2r1": "rke2-cis-1.5-hardened"
-  "v1.18.10+rke2r1": "rke2-cis-1.5-permissive"
+#  "v1.18.10+rke2r1": "rke2-cis-1.5-permissive"
 
 target_mapping:
   "cis-1.5":
