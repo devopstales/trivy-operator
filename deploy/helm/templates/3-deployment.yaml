@@ -38,6 +38,18 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        - name: SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
         - name: TZ
           value: {{ .Values.TimeZone }}
         - name: LOG_LEVEL
@@ -66,6 +78,10 @@ spec:
 {{- if .Values.offline.db_repository }}
         - name: DB_REPOSITORY
           value: "{{ .Values.offline.db_repository }}"
+{{- if .Values.offline.db_repository_insecure }}
+        - name: DB_REPOSITORY_INSECURE
+          value: "{{ .Values.offline.db_repository_insecure }}"
+{{- end }}
 {{- end }}
 {{- end }}
 {{- if .Values.persistence.enabled }}

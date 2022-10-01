@@ -1327,7 +1327,7 @@ async def startup_sc_deployer( logger, spec, **kwargs):
     logger.info("ClustereScanner Created")
 
     ds_name = "kube-bech-scanner"
-    ds_image = "devopstales/kube-bench-scnner:2.5-devel"
+    ds_image = "devopstales/kube-bench-scnner:2.5"
     pod_name = os.environ.get("POD_NAME")
     pod_uid = os.environ.get("POD_UID")
     namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")

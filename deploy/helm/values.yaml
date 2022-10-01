@@ -23,6 +23,7 @@ serviceAccount:
 offline:
   enabled: false
 #  db_repository: localhost:5000/trivy-db
+#  db_repository_insecure: False
 
 cache:
   enabled: false
