@@ -23,6 +23,8 @@ helm upgrade --install \
 
 To find out the password, run the following command:
 
+
+
 ```bash
 echo "DefectDojo admin password: $(kubectl \
   get secret defectdojo \
@@ -32,6 +34,13 @@ echo "DefectDojo admin password: $(kubectl \
 
 Enable deduplication for findings:
 
+Select Gear icon and `Aplication Settings`:
+
+![Application settings](../img/application-settings.png)
+
+Then thick `Deduplicate findings`:
+
+![Deduplicate findings](../img/duplication-settings.png)
 ### Enable DefectDojo integration for trivy-operator
 
 To enable the DefectDojo integration for trivy-operator you need to enable it in the `NamespaceScanner` object:

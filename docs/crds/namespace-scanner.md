@@ -6,7 +6,9 @@ The following example object is configured to:
 
 * run the vulnerability scan every hour (`crontab: '00 * * * *'`)
 * test only the namespaces wit the the `trivy-scan: "true"`
-* use the users fo authentication to pulling image
+* enable integration to defectdojo
+* use the `users` fo authentication to pulling image
+* use the `devopstales-dockerhub` secret to pulling image
 
 ```yaml
 apiVersion: trivy-operator.devopstales.io/v1
@@ -32,7 +34,7 @@ spec:
     insecure: true
 ```
 
-The following list show the NamespaceScanner objects listed by the kbectl cli:
+The following list show the NamespaceScanner objects listed by the kubectl cli:
 
 ```bash
 kubectl get ns-scan

@@ -17,4 +17,8 @@ kubectl port-forward service/policy-reporter-ui 8082:8080 -n policy-reporter
 
 Open `http://localhost:8082/` in your browser.
 
+### VulnerabilityReports
 ![VulnerabilityReports](../img/policy_report.png)
+
+### ClusterVulnerabilityReports
+![ClusterVulnerabilityReports](../img/cluster_policy_report.png)

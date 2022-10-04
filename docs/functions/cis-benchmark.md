@@ -10,4 +10,4 @@ Trivy-operator use kube-bench to scan the kubernetes cluster and create CIS Benc
 
 ## Example Deploy:
 
-To enable the CIS Benchmark scanning function you need to create a [ClusterScanner]/trivy-operator/crds/cluster-scanner/
+To enable the CIS Benchmark scanning function you need to create a [ClusterScanner](/trivy-operator/crds/cluster-scanner/)
