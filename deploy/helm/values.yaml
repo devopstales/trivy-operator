@@ -1,68 +1,90 @@
 image:
+  # -- The docker image repository to use
   repository: devopstales/trivy-operator
+  # -- The docker image pull policy
   pullPolicy: Always
-  tag: "2.4.1"
+  # -- The docker image tag to use
+  tag: "2.5.0"
 
+# -- Time Zone in container
 TimeZone: UTC
 
-# Log level
+# -- Log level
 log_level: "INFO"
 # INFO, HIGH, DEBUG
 
+# -- list of secrets to use for imae pull
 imagePullSecrets: []
+# -- security options for the pod
 podSecurityContext:
   fsGroup: 10001
   fsGroupChangePolicy: "OnRootMismatch"
 
 serviceAccount:
+  # -- Enable serviceAccount creation
   create: true
+  # -- serviceAccount annotations
   annotations: {}
+  # -- Name of the serviceAccount
   name: "trivy-operator"
 
 # Dont try to download trivy db, run in air-gapped env:
 offline:
+  # -- enable air-gapped mode
   enabled: false
-#  db_repository: localhost:5000/trivy-db
-#  db_repository_insecure: False
+  # -- repository to use for download trivy vuln db
+  db_repository: localhost:5000/trivy-db
+  # -- insecure repository
+  db_repository_insecure: False
 
 cache:
+  # -- enable redis cache
   enabled: false
 
 monitoring:
+  # -- configure prometheus monitoring port
   port: "9115"
 
 # deploy service monitor
 serviceMonitor:
+  # -- allow to override the namespace for serviceMonitor
   enabled: false
-  # allow to override the namespace for serviceMonitor
-  namespace:
-  # labels to match the serviceMonitorSelector of the Prometheus Resource
+  # -- Name of the namespace for serviceMonitor
+  namespace: {}
   labels:
+    # -- labels to match the serviceMonitorSelector of the Prometheus Resource
     release: prometheus
   # https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#relabelconfig
+  # -- relabel config for serviceMonitor
   relabelings: []
   # see serviceMonitor.relabelings
+  # -- metricRelabeling config for serviceMonitor
   metricRelabelings: []
 
 grafana:
-  # namespace for configMap of grafana dashboards
+  # -- namespace for configMap of grafana dashboards
   namespace:
   dashboards:
-    # Enable the deployment of grafana dashboards
+    # -- Enable the deployment of grafana dashboards
     enabled: true
-    # Label to find dashboards using the k8s sidecar
+    # -- Label to find dashboards using the k8s sidecar
     label: grafana_dashboard
+    # -- Label value to find dashboards using the k8s sidecar
     value: "1"
   folder:
-    # Annotation to enable folder storage using the k8s sidecar
+    # -- Annotation to enable folder storage using the k8s sidecar
     annotation: grafana_folder
-    # Grafana folder in which to store the dashboards
+    # -- Grafana folder in which to store the dashboards
     name: Policy Reporter
 
 persistence:
+  # -- Volumes for the pod
   enabled: true
+  # -- Volumes mode
   accessMode: "ReadWriteOnce"
+  # -- Volumes size
   size: "1Gi"
+  # -- Volumes annotations
   annotations: {}
   ## database data Persistent Volume Storage Class
   ## If defined, storageClassName: <storageClass>
@@ -87,27 +109,36 @@ namespaceScanner:
 
 kube_bench_scnner:
   image:
+    # -- The docker image repository to use
     repository: devopstales/kube-bench-scnner
+    # -- The docker image pull policy
     pullPolicy: Always
+    # -- The docker image tag to use
     tag: "2.5"
 
 clusterScanner:
+  # -- enable clusterScanner cr creation
   enabled: false
+  # -- crontab for scheduled scan
   crontab: "*/1 * * * *"
+  # -- kube-hunter scan profile
   scanProfileName: "cis-1.23"
-  integrations:
+  # -- configure defectdojo integration
+  integrations: {}
 #    defectdojo:
 #      host: "https://defectdojo.k8s.intra"
 #      api_key: "xyz456ucdssd67sd67dsg"
 #      k8s-cluster-name: "eks-prod"
 
-# enable adission controller
 admissionController:
+  # -- enable adission controller
   enabled: false
 
 # authentication informatin for trivy to use wen scan image
 registryAuth:
+  # -- enable registry authentication
   enabled: false
+  # -- list of image pull secrets for authentication
   image_pull_secrets:
     - regcred
 ## list containing the names of the image pull secrets 
@@ -119,17 +150,19 @@ registryAuth:
 
 # github authentiation token for trivy database download
 githubToken:
+  # -- enable github authentiation token
   enabled: false
+  # -- github authentiation token value
   token: ""
 
 ## Define which Nodes the Pods are scheduled on.
 ## ref: https://kubernetes.io/docs/user-guide/node-selection/
-##
+# -- Set the node selector for the pod.
 nodeSelector: {}
 
 ## Tolerations for use with node taints
 ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-##
+# -- Set the tolerations for the pod.
 tolerations: []
 # - key: "key"
 #   operator: "Equal"
@@ -138,7 +171,7 @@ tolerations: []
 
 ## Assign custom affinity rules to the trivy operator
 ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
-##
+# -- Set the affinity for the pod.
 affinity: {}
 # nodeAffinity:
 #   requiredDuringSchedulingIgnoredDuringExecution:

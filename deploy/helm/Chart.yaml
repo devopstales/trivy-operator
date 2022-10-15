@@ -1,9 +1,9 @@
 apiVersion: v2
 name: trivy-operator
-description: A Helm chart for trivy-operator
+description: "This chart deploys an operator that default every 5 minutes execute a scan script. It will get image list from all namespaces with the label `trivy-scan=true`, and then scan this images with trivy, finally we will get metrics on `http://[pod-ip]:9115/metrics`"
 type: application
 version: 2.5.0
-appVersion: "1.16.0"
+appVersion: "0.23.0"
 kubeVersion: ">=1.19.x-0"
 keywords:
   - Trivy
