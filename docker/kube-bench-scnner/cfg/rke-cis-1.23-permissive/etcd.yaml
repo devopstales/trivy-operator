@@ -10,13 +10,14 @@ groups:
     checks:
       - id: 1.1.11
         text: "Ensure that the etcd data directory permissions are set to 700 or more restrictive (Automated)"
-        audit: ps -ef | grep $etcdbin | grep -- --data-dir | sed 's%.*data-dir[= ]\([^ ]*\).*%\1%' | xargs stat -c permissions=%a
+        audit: stat -c %a /node/var/lib/etcd
         tests:
           test_items:
-            - flag: "permissions"
+            - flag: "700"
               compare:
-                op: bitmask
+                op: eq
                 value: "700"
+              set: true
         remediation: |
           On the etcd server node, get the etcd data directory, passed as an argument --data-dir,
           from the command 'ps -ef | grep etcd'.
@@ -26,10 +27,12 @@ groups:
 
       - id: 1.1.12
         text: "Ensure that the etcd data directory ownership is set to etcd:etcd (Automated)"
-        audit: ps -ef | grep $etcdbin | grep -- --data-dir | sed 's%.*data-dir[= ]\([^ ]*\).*%\1%' | xargs stat -c %U:%G
+        type: "skip"
+        audit: "stat -c %U:%G /node/var/lib/etcd"
         tests:
           test_items:
             - flag: "etcd:etcd"
+              set: true
         remediation: |
           On the etcd server node, get the etcd data directory, passed as an argument --data-dir,
           from the command 'ps -ef | grep etcd'.
@@ -39,11 +42,14 @@ groups:
 
       - id: 1.1.19
         text: "Ensure that the Kubernetes PKI directory and file ownership is set to root:root (Automated)"
-        audit: "find /etc/kubernetes/pki/ | xargs stat -c %U:%G"
-        use_multiple_values: true
+        audit: "check_files_owner_in_dir.sh /node/etc/kubernetes/ssl"
         tests:
           test_items:
-            - flag: "root:root"
+            - flag: "true"
+              compare:
+                op: eq
+                value: "true"
+              set: true
         remediation: |
           Run the below command (based on the file location on your system) on the control plane node.
           For example,

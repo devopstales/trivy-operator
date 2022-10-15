@@ -11,6 +11,7 @@ groups:
       - id: 4.1.1
         text: "Ensure that the kubelet service file permissions are set to 644 or more restrictive (Automated)"
         audit: '/bin/sh -c ''if test -e $kubeletsvc; then stat -c permissions=%a $kubeletsvc; fi'' '
+        type: "skip"
         tests:
           test_items:
             - flag: "permissions"
@@ -283,12 +284,17 @@ groups:
         audit: "/bin/ps -fC $kubeletbin"
         audit_config: "/bin/cat $kubeletconf"
         tests:
-          test_items:
+          bin_op: or
+          test_items:          
             - flag: --protect-kernel-defaults
               path: '{.protectKernelDefaults}'
               compare:
                 op: eq
-                value: true
+                value: true                
+              set: true
+            - flag: --protect-kernel-defaults
+              path: '{.protectKernelDefaults}'
+              set: false
         remediation: |
           If using a Kubelet config file, edit the file to set `protectKernelDefaults` to `true`.
           If using command line arguments, edit the kubelet service file

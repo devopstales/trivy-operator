@@ -11,12 +11,14 @@ groups:
       - id: 4.1.1
         text: "Ensure that the kubelet service file permissions are set to 644 or more restrictive (Automated)"
         audit: '/bin/sh -c ''if test -e $kubeletsvc; then stat -c permissions=%a $kubeletsvc; fi'' '
+        type: "skip"
         tests:
           test_items:
             - flag: "permissions"
               compare:
                 op: bitmask
                 value: "644"
+              set: true  
         remediation: |
           Run the below command (based on the file location on your system) on the each worker node.
           For example,
@@ -104,10 +106,10 @@ groups:
 
       - id: 4.1.7
         text: "Ensure that the certificate authorities file permissions are set to 644 or more restrictive (Manual)"
-        audit: "stat -c %a /var/lib/rancher/rke2/server/tls/server-ca.crt"
+        audit: "check_cafile_permissions.sh"
         tests:
           test_items:
-            - flag: "644"
+            - flag: "permissions"
               compare:
                 op: bitmask
                 value: "644"
@@ -115,7 +117,7 @@ groups:
         remediation: |
           Run the following command to modify the file permissions of the
           --client-ca-file chmod 644 <filename>
-        scored: false
+        scored: true
 
       - id: 4.1.8
         text: "Ensure that the client certificate authorities file ownership is set to root:root (Automated)"
@@ -265,9 +267,10 @@ groups:
               compare:
                 op: noteq
                 value: 0
+              set: true
             - flag: --streaming-connection-idle-timeout
               path: '{.streamingConnectionIdleTimeout}'
-              set: true
+              set: false
           bin_op: or
         remediation: |
           If using a Kubelet config file, edit the file to set streamingConnectionIdleTimeout to a
@@ -286,12 +289,17 @@ groups:
         audit: "/bin/ps -fC $kubeletbin"
         audit_config: "/bin/cat $kubeletconf"
         tests:
+          bin_op: or
           test_items:
             - flag: --protect-kernel-defaults
               path: '{.protectKernelDefaults}'
               compare:
                 op: eq
                 value: true
+              set: true
+            - flag: --protect-kernel-defaults
+              path: '{.protectKernelDefaults}'
+              set: false              
         remediation: |
           If using a Kubelet config file, edit the file to set protectKernelDefaults: true.
           If using command line arguments, edit the kubelet service file

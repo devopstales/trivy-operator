@@ -537,14 +537,16 @@ groups:
 
       - id: 1.2.18
         text: "Ensure that the --insecure-port argument is set to 0 (Automated)"
-        audit: "/bin/ps -ef | grep $apiserverbin | grep -v grep"
+        audit: "/bin/ps -ef | grep $apiserverbin"
         tests:
+          bin_op: or
           test_items:
             - flag: "--insecure-port"
               compare:
                 op: eq
                 value: 0
-              set: true  
+            - flag: "--insecure-port"
+              set: false 
         remediation: |
           Edit the API server pod specification file $apiserverconf
           on the master node and set the below parameter.

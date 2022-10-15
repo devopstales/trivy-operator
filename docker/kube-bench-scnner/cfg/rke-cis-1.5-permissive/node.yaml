@@ -331,7 +331,7 @@ groups:
       - id: 4.2.1
         text: "Ensure that the --anonymous-auth argument is set to false (Scored)"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: "--anonymous-auth"
@@ -355,7 +355,7 @@ groups:
       - id: 4.2.2
         text: "Ensure that the --authorization-mode argument is not set to AlwaysAllow (Scored)"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: --authorization-mode
@@ -378,7 +378,7 @@ groups:
       - id: 4.2.3
         text: "Ensure that the --client-ca-file argument is set as appropriate (Scored)"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: --client-ca-file
@@ -399,7 +399,7 @@ groups:
       - id: 4.2.4
         text: "Ensure that the --read-only-port argument is set to 0 (Scored)"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: "--read-only-port"
@@ -422,7 +422,7 @@ groups:
       - id: 4.2.5
         text: "Ensure that the --streaming-connection-idle-timeout argument is not set to 0 (Scored)"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: --streaming-connection-idle-timeout
@@ -451,7 +451,7 @@ groups:
         text: "Ensure that the --protect-kernel-defaults argument is set to true (Scored)"
         type: "skip"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: --protect-kernel-defaults
@@ -475,7 +475,7 @@ groups:
       - id: 4.2.7
         text: "Ensure that the --make-iptables-util-chains argument is set to true (Scored) "
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: --make-iptables-util-chains
@@ -524,7 +524,7 @@ groups:
       - id: 4.2.9
         text: "Ensure that the --event-qps argument is set to 0 or a level which ensures appropriate event capture (Not Scored)"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: --event-qps
@@ -547,7 +547,7 @@ groups:
         text: "Ensure that the --tls-cert-file and --tls-private-key-file arguments are set as appropriate (Scored)"
         type: "skip"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: --tls-cert-file
@@ -575,7 +575,7 @@ groups:
       - id: 4.2.11
         text: "Ensure that the --rotate-certificates argument is not set to false (Scored)"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: --rotate-certificates
@@ -604,7 +604,7 @@ groups:
         text: "Ensure that the RotateKubeletServerCertificate argument is set to true (Scored)"
         type: "skip"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: RotateKubeletServerCertificate
@@ -627,7 +627,7 @@ groups:
       - id: 4.2.13
         text: "Ensure that the Kubelet only makes use of Strong Cryptographic Ciphers (Not Scored)"
         audit: "/bin/ps -fC $kubeletbin"
-        audit_config: "/bin/cat $kubeletconf"
+        audit_config: "/bin/sh -c 'if test -e $kubeletconf; then /bin/cat $kubeletconf; fi' "
         tests:
           test_items:
             - flag: --tls-cipher-suites

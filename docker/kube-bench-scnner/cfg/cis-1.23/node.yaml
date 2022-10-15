@@ -1,6 +1,6 @@
 ---
 controls:
-version: "cis-1.23"
+version: "1.23"
 id: 4
 text: "Worker Node Security Configuration"
 type: "node"
@@ -96,10 +96,7 @@ groups:
 
       - id: 4.1.7
         text: "Ensure that the certificate authorities file permissions are set to 644 or more restrictive (Manual)"
-        audit: |
-          CAFILE=$(ps -ef | grep kubelet | grep -v apiserver | grep -- --client-ca-file= | awk -F '--client-ca-file=' '{print $2}' | awk '{print $1}')
-          if test -z $CAFILE; then CAFILE=$kubeletcafile; fi
-          if test -e $CAFILE; then stat -c permissions=%a $CAFILE; fi
+        audit: "check_cafile_permissions.sh"
         tests:
           test_items:
             - flag: "permissions"
@@ -113,10 +110,7 @@ groups:
 
       - id: 4.1.8
         text: "Ensure that the client certificate authorities file ownership is set to root:root (Manual)"
-        audit: |
-          CAFILE=$(ps -ef | grep kubelet | grep -v apiserver | grep -- --client-ca-file= | awk -F '--client-ca-file=' '{print $2}' | awk '{print $1}')
-          if test -z $CAFILE; then CAFILE=$kubeletcafile; fi
-          if test -e $CAFILE; then stat -c %U:%G $CAFILE; fi
+        audit: "check_cafile_ownership.sh"
         tests:
           test_items:
             - flag: root:root

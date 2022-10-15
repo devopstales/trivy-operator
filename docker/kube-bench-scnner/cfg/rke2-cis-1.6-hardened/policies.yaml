@@ -197,7 +197,7 @@ groups:
     checks:
       - id: 5.3.1
         text: "Ensure that the CNI in use supports Network Policies (Automated)"
-        audit: "kubectl get pods -n kube-system -l k8s-app=canal -o json | jq .items[] | jq .metadata.name | wc -l | xargs -I {} echo '--count={}'"
+        audit: "kubectl get pods --all-namespaces --selector='k8s-app in (calico-node, canal, cilium)' -o name | wc -l | xargs -I {} echo '--count={}'"
         tests:
           test_items:
             - flag: "count"
@@ -209,7 +209,7 @@ groups:
           If the CNI plugin in use does not support network policies, consideration should be given to
           making use of a different plugin, or finding an alternate mechanism for restricting traffic
           in the Kubernetes cluster.
-        scored: True
+        scored: true
 
       - id: 5.3.2
         text: "Ensure that all Namespaces have Network Policies defined (Automated)"

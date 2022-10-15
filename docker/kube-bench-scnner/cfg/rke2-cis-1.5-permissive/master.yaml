@@ -127,12 +127,12 @@ groups:
 
     - id: 1.1.13
       text: "Ensure that the admin.conf file permissions are set to 644 or more restrictive (Scored)"
-      audit: stat -c %a /var/lib/rancher/rke2/server/cred/admin.kubeconfig
+      audit: stat -c permissions=%a /var/lib/rancher/rke2/server/cred/admin.kubeconfig
       tests:
         test_items:
-          - flag: "644"
+          - flag: "permissions"
             compare:
-              op: eq
+              op: bitmask
               value: "644"
             set: true
       remediation: |
@@ -256,7 +256,7 @@ groups:
 
     - id: 1.1.21
       text: "Ensure that the Kubernetes PKI key file permissions are set to 600 (Scored)"
-      audit: "check_files_permissions.sh /var/lib/rancher/rke2/server/tls/*.key 600"
+      audit: "check_files_permissions.sh '/var/lib/rancher/rke2/server/tls/*.key' 600"
       tests:
         test_items:
           - flag: "true"
@@ -578,14 +578,16 @@ groups:
 
     - id: 1.2.19
       text: "Ensure that the --insecure-port argument is set to 0 (Scored)"
-      audit: "/bin/ps -ef | grep $apiserverbin | grep -v grep"
+      audit: "/bin/ps -ef | grep $apiserverbin"
       tests:
+        bin_op: or
         test_items:
           - flag: "--insecure-port"
             compare:
               op: eq
               value: 0
-            set: true
+          - flag: "--insecure-port"
+            set: false
       remediation: |
         Edit the API server pod specification file $apiserverconf
         on the master node and set the below parameter.

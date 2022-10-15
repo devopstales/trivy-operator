@@ -1,6 +1,6 @@
 ---
 controls:
-version: "cis-1.20"
+version: "1.20"
 id: 1
 text: "Master Node Security Configuration"
 type: "master"
@@ -813,7 +813,8 @@ groups:
         scored: false
 
       - id: 1.2.33
-        text: "Ensure that encryption providers are appropriately configured (Manual)"
+        text: "Ensure that encryption providers are appropriately configured (Manual)"        
+        type: "manual"
         audit: |
           ENCRYPTION_PROVIDER_CONFIG=$(ps -ef | grep $apiserverbin | grep -- --encryption-provider-config | sed 's%.*encryption-provider-config[= ]\([^ ]*\).*%\1%')
           if test -e $ENCRYPTION_PROVIDER_CONFIG; then grep -A1 'providers:' $ENCRYPTION_PROVIDER_CONFIG | tail -n1 | grep -o "[A-Za-z]*" | sed 's/^/provider=/'; fi

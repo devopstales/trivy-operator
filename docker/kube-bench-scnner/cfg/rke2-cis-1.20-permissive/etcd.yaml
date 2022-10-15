@@ -42,13 +42,14 @@ groups:
 
       - id: 1.1.11
         text: "Ensure that the etcd data directory permissions are set to 700 or more restrictive (Automated)"
-        audit: stat -c %a /var/lib/rancher/rke2/server/db/etcd
+        audit: "stat -c permissions=%a /var/lib/rancher/rke2/server/db/etcd"
         tests:
           test_items:
             - flag: "permissions"
               compare:
                 op: bitmask
                 value: "700"
+              set: true  
         remediation: |
           On the etcd server node, get the etcd data directory, passed as an argument --data-dir,
           from the below command:
@@ -60,7 +61,7 @@ groups:
       - id: 1.1.12
         text: "Ensure that the etcd data directory ownership is set to etcd:etcd (Automated)"
         type: "skip"
-        audit: stat -c %U:%G /var/lib/rancher/rke2/server/db/etcd
+        audit: "stat -c %U:%G /var/lib/rancher/rke2/server/db/etcd"
         tests:
           test_items:
             - flag: "etcd:etcd"
@@ -92,6 +93,7 @@ groups:
           --cert-file=</path/to/ca-file>
           --key-file=</path/to/key-file>
         scored: true
+        type: "skip"
 
       - id: 2.2
         text: "Ensure that the --client-cert-auth argument is set to true (Automated)"

@@ -62,7 +62,7 @@ groups:
 
       - id: 1.1.20
         text: "Ensure that the Kubernetes PKI certificate file permissions are set to 644 or more restrictive (Scored) "
-        audit: "check_files_permissions.sh /node/etc/kubernetes/ssl/!(*key).pem"
+        audit: "check_files_permissions.sh '/node/etc/kubernetes/ssl/!(*key).pem' "
         tests:
           test_items:
             - flag: "true"
@@ -78,7 +78,7 @@ groups:
 
       - id: 1.1.21
         text: "Ensure that the Kubernetes PKI key file permissions are set to 600 (Scored)"
-        audit: "check_files_permissions.sh /node/etc/kubernetes/ssl/*key.pem 600"
+        audit: "check_files_permissions.sh '/node/etc/kubernetes/ssl/*key.pem' 600"
         tests:
           test_items:
             - flag: "true"

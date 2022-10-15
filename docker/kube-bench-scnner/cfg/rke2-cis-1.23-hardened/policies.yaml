@@ -242,7 +242,7 @@ groups:
     checks:
       - id: 5.3.1
         text: "Ensure that the CNI in use supports Network Policies (Automated)"
-        audit: "kubectl get pods -n kube-system -l k8s-app=canal -o json | jq .items[] | jq .metadata.name | wc -l | xargs -I {} echo '--count={}'"
+        audit: "kubectl get pods --all-namespaces --selector='k8s-app in (calico-node, canal, cilium)' -o name | wc -l | xargs -I {} echo '--count={}'"
         tests:
           test_items:
             - flag: "count"

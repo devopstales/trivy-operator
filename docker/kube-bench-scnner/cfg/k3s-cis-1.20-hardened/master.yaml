@@ -227,7 +227,7 @@ groups:
 
       - id: 1.1.15
         text: "Ensure that the scheduler.conf file permissions are set to 644 or more restrictive (Automated)"
-        audit: "/bin/sh -c 'if test -e $schedulerkubeconfig; then stat -c permissions=%a $schedulerkubeconfig; fi'"
+        audit: "/bin/sh -c 'if test -e /var/lib/rancher/k3s/server/cred/scheduler.kubeconfig; then stat -c permissions=%a /var/lib/rancher/k3s/server/cred/scheduler.kubeconfig; fi'"
         tests:
           test_items:
             - flag: "permissions"
@@ -242,7 +242,7 @@ groups:
 
       - id: 1.1.16
         text: "Ensure that the scheduler.conf file ownership is set to root:root (Automated)"
-        audit: "/bin/sh -c 'if test -e $schedulerkubeconfig; then stat -c %U:%G $schedulerkubeconfig; fi'"
+        audit: "/bin/sh -c 'if test -e /var/lib/rancher/k3s/server/cred/scheduler.kubeconfig; then stat -c %U:%G /var/lib/rancher/k3s/server/cred/scheduler.kubeconfig; fi'"
         tests:
           test_items:
             - flag: "root:root"
@@ -254,7 +254,7 @@ groups:
 
       - id: 1.1.17
         text: "Ensure that the controller-manager.conf file permissions are set to 644 or more restrictive (Automated)"
-        audit: "/bin/sh -c 'if test -e $controllermanagerkubeconfig; then stat -c permissions=%a $controllermanagerkubeconfig; fi'"
+        audit: "/bin/sh -c 'if test -e /var/lib/rancher/k3s/server/cred/controller.kubeconfig; then stat -c permissions=%a /var/lib/rancher/k3s/server/cred/controller.kubeconfig; fi'"
         tests:
           test_items:
             - flag: "permissions"
@@ -285,7 +285,7 @@ groups:
 
       - id: 1.1.19
         text: "Ensure that the Kubernetes PKI directory and file ownership is set to root:root (Automated)"
-        audit: "find /etc/kubernetes/pki/ | xargs stat -c %U:%G"
+        audit: "find /var/lib/rancher/k3s/server/tls | xargs stat -c %U:%G"
         use_multiple_values: true
         tests:
           test_items:
@@ -349,7 +349,7 @@ groups:
 
       - id: 1.2.2
         text: "Ensure that the --token-auth-file parameter is not set (Automated)"
-        audit: "journalctl -D /var/log/journal  -u k3s | grep 'Running kube-apiserver' | tail -n1 | grep 'token-auth-file'"
+        audit: "journalctl -D /var/log/journal  -u k3s | grep 'Running kube-apiserver' | tail -n1 | grep -v grep"
         tests:
           test_items:
             - flag: "--token-auth-file"
@@ -549,7 +549,7 @@ groups:
 
       - id: 1.2.14
         text: "Ensure that the admission control plugin NamespaceLifecycle is set (Automated)"
-        audit: "journalctl -D /var/log/journal  -u k3s | grep 'Running kube-apiserver' | tail -n1 | grep 'disable-admission-plugins'"
+        audit: "journalctl -D /var/log/journal  -u k3s | grep 'Running kube-apiserver' | tail -n1 | grep -v grep"
         tests:
           bin_op: or
           test_items:
@@ -602,7 +602,7 @@ groups:
 
       - id: 1.2.17
         text: "Ensure that the --insecure-bind-address argument is not set (Automated)"
-        audit: "journalctl -D /var/log/journal  -u k3s | grep 'Running kube-apiserver' | tail -n1 | grep 'insecure-bind-address'"
+        audit: "journalctl -D /var/log/journal  -u k3s | grep 'Running kube-apiserver' | tail -n1 | grep -v grep"
         tests:
           test_items:
             - flag: "--insecure-bind-address"
@@ -614,13 +614,16 @@ groups:
 
       - id: 1.2.18
         text: "Ensure that the --insecure-port argument is set to 0 (Automated)"
-        audit: "journalctl -D /var/log/journal  -u k3s | grep 'Running kube-apiserver' | tail -n1 | grep 'insecure-port'"
+        audit: "journalctl -D /var/log/journal  -u k3s | grep 'Running kube-apiserver' | tail -n1"
         tests:
+          bin_op: or
           test_items:
             - flag: "--insecure-port"
               compare:
                 op: eq
                 value: 0
+            - flag: "--insecure-port"
+              set: false
         remediation: |
           Edit the API server pod specification file $apiserverconf
           on the master node and set the below parameter.

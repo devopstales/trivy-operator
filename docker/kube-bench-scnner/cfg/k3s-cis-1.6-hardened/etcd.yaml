@@ -30,11 +30,15 @@ groups:
         text: "Ensure that the --client-cert-auth argument is set to true (Automated)"
         audit: "check_for_k3s_etcd.sh 2.2"
         tests:
+          bin_op: or
           test_items:
             - flag: "--client-cert-auth"
+              set: true
+            - flag: "client-cert-auth"
               compare:
                 op: eq
                 value: true
+              set: true
         remediation: |
           Edit the etcd pod specification file $etcdconf on the master
           node and set the below parameter.
@@ -82,11 +86,15 @@ groups:
         text: "Ensure that the --peer-client-cert-auth argument is set to true (Automated)"
         audit: "check_for_k3s_etcd.sh 2.5"
         tests:
+          bin_op: or
           test_items:
             - flag: "--client-cert-auth"
+              set: true
+            - flag: "client-cert-auth"
               compare:
                 op: eq
                 value: true
+              set: true
         remediation: |
           Edit the etcd pod specification file $etcdconf on the master
           node and set the below parameter.

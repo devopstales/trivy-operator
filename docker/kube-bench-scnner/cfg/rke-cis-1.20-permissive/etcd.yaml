@@ -10,13 +10,14 @@ groups:
     checks:
     - id: 1.1.11
       text: "Ensure that the etcd data directory permissions are set to 700 or more restrictive (Automated)"
-      audit: ps -ef | grep $etcdbin | grep -- --data-dir | sed 's%.*data-dir[= ]\([^ ]*\).*%\1%' | xargs stat -c permissions=%a
+      audit: stat -c %a /node/var/lib/etcd
       tests:
         test_items:
-          - flag: "permissions"
+          - flag: "700"
             compare:
-              op: bitmask
+              op: eq
               value: "700"
+            set: true
       remediation: |
         On the etcd server node, get the etcd data directory, passed as an argument --data-dir,
         from the below command:
@@ -27,10 +28,12 @@ groups:
 
     - id: 1.1.12
       text: "Ensure that the etcd data directory ownership is set to etcd:etcd (Automated)"
-      audit: ps -ef | grep $etcdbin | grep -- --data-dir | sed 's%.*data-dir[= ]\([^ ]*\).*%\1%' | xargs stat -c %U:%G
+      type: "skip"
+      audit: stat -c %U:%G /node/var/lib/etcd
       tests:
         test_items:
           - flag: "etcd:etcd"
+            set: true
       remediation: |
         On the etcd server node, get the etcd data directory, passed as an argument --data-dir,
         from the below command:
@@ -56,7 +59,7 @@ groups:
       scored: true
     - id: 1.1.20
       text: "Ensure that the Kubernetes PKI certificate file permissions are set to 644 or more restrictive (Automated)"
-      audit: "check_files_permissions.sh /node/etc/kubernetes/ssl/!(*key).pem"
+      audit: "check_files_permissions.sh '/node/etc/kubernetes/ssl/!(*key).pem'"
       use_multiple_values: true
       tests:
         test_items:
@@ -72,7 +75,7 @@ groups:
       scored: true
     - id: 1.1.21
       text: "Ensure that the Kubernetes PKI key file permissions are set to 600 (Automated)"
-      audit: "check_files_permissions.sh /node/etc/kubernetes/ssl/*key.pem 600"
+      audit: "check_files_permissions.sh '/node/etc/kubernetes/ssl/*key.pem' 600"
       use_multiple_values: true
       tests:
         test_items:
@@ -151,8 +154,7 @@ groups:
         scored: true
 
       - id: 2.4
-        text: "Ensure that the --peer-cert-file and --peer-key-file arguments are
-        set as appropriate (Automated)"
+        text: "Ensure that the --peer-cert-file and --peer-key-file arguments are set as appropriate (Automated)"
         audit: "/bin/ps -ef | /bin/grep $etcdbin | /bin/grep -v grep"
         tests:
           bin_op: and

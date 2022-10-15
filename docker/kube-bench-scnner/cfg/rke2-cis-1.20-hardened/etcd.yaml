@@ -42,7 +42,7 @@ groups:
 
       - id: 1.1.11
         text: "Ensure that the etcd data directory permissions are set to 700 or more restrictive (Automated)"
-        audit: ps -ef | grep $etcdbin | grep -- --data-dir | sed 's%.*data-dir[= ]\([^ ]*\).*%\1%' | xargs stat -c permissions=%a
+        audit: stat -c permissions=%a /var/lib/rancher/rke2/server/db/etcd
         tests:
           test_items:
             - flag: "permissions"

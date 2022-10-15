@@ -1,6 +1,6 @@
 ---
 controls:
-version: "cis-1.23"
+version: "1.23"
 id: 5
 text: "Kubernetes Policies"
 type: "policies"

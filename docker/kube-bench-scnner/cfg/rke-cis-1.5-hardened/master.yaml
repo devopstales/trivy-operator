@@ -509,7 +509,7 @@ groups:
 
       - id: 1.1.20
         text: "Ensure that the Kubernetes PKI certificate file permissions are set to 644 or more restrictive (Scored) "
-        audit: "check_files_permissions.sh /node/etc/kubernetes/ssl/!(*key).pem"
+        audit: "check_files_permissions.sh '/node/etc/kubernetes/ssl/!(*key).pem'"
         tests:
           test_items:
             - flag: "true"
@@ -525,7 +525,7 @@ groups:
 
       - id: 1.1.21
         text: "Ensure that the Kubernetes PKI key file permissions are set to 600 (Scored)"
-        audit: "check_files_permissions.sh /node/etc/kubernetes/ssl/*key.pem 600"
+        audit: "check_files_permissions.sh '/node/etc/kubernetes/ssl/*key.pem' 600"
         tests:
           test_items:
             - flag: "true"
@@ -847,14 +847,16 @@ groups:
 
       - id: 1.2.19
         text: "Ensure that the --insecure-port argument is set to 0 (Scored)"
-        audit: "/bin/ps -ef | grep $apiserverbin | grep -v grep"
+        audit: "/bin/ps -ef | grep $apiserverbin"
         tests:
+          bin_op: or
           test_items:
             - flag: "--insecure-port"
               compare:
                 op: eq
                 value: 0
-              set: true
+            - flag: "--insecure-port"
+              set: false
         remediation: |
           Edit the API server pod specification file $apiserverconf
           on the master node and set the below parameter.
