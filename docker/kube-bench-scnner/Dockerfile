@@ -17,7 +17,7 @@ RUN wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/s
 RUN pip3 install --no-cache-dir kopf kubernetes croniter prometheus_client
 
 COPY kube-bench-scnner.py /kube-bench-scnner.py
-ADD ${ARCH}cfg /etc/kube-bench/cfg
+ADD cfg /etc/kube-bench/cfg
 COPY ${ARCH}kube-bench /usr/local/bin/
 
 ENV PATH=$PATH:/usr/local/mount-from-host/bin
