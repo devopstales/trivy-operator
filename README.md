@@ -148,3 +148,4 @@ echo "172.17.12.10 host.k3d.internal" >> /etc/host
 ```bash
 kopf run -A ./trivy-operator.py
 ```
+

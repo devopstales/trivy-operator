@@ -1,0 +1,91 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trivy-operator
+  namespace: trivy-operator
+spec:
+  selector:
+    matchLabels:
+      app: trivy-operator
+  template:
+    metadata:
+      labels:
+        app: trivy-operator
+      annotations:
+        prometheus.io/port: "9115"
+        prometheus.io/scrape: "true"
+    spec:
+      securityContext:
+          fsGroup: 10001
+          fsGroupChangePolicy: "OnRootMismatch"
+      serviceAccountName: trivy-operator
+      containers:
+      - image: devopstales/trivy-operator:2.4
+        imagePullPolicy: IfNotPresent
+        name: trivy-operator
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        - name: SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
+        - name: REDIS_ENABLED
+          value: "True"
+        - name: REDIS_BACKEND
+          value: "redis://trivy-cache:6379"
+#        - name: GITHUB_TOKEN
+#          value: MY-TOKEN-FROM-GITHUB
+        volumeMounts:
+        - name: cache
+          mountPath: "/home/trivy-operator/trivy-cache/"
+#        - name: config-json
+#          mountPath: "/home/trivy-operator/.docker"
+        ports:
+          - containerPort: 9115
+      volumes:
+      - name: cache
+        persistentVolumeClaim:
+            claimName: "trivy-cache"
+#      - name: config-json
+#        secret:
+#          secretName: config-json
+--- 
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: 
+  name: trivy-cache
+  namespace: trivy-operator
+spec: 
+  accessModes: 
+    - ReadWriteOnce
+  resources: 
+    requests: 
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: trivy-operator
+  name: trivy-operator
+  namespace: trivy-operator
+spec:
+  selector:
+    app: trivy-operator
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 9115
+      targetPort: 9115

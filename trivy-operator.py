@@ -1,30 +1,33 @@
-import kopf
+import kopf, prometheus_client
 import kubernetes.client as k8s_client
 import kubernetes.config as k8s_config
 from kubernetes.client.rest import ApiException
-import logging
-import prometheus_client
-#import asyncio
-#import pycron
+#import asyncio, pycron
 from croniter import croniter
 from datetime import datetime, timedelta, timezone
 import time
-import os
-import sys
-import subprocess
-import json
-import validators
-import base64
+import os, six, json, subprocess, validators, base64
 from typing import AsyncIterator, Optional, Tuple, Collection
 from OpenSSL import crypto
-import logging
-import uuid
+import logging, uuid, requests
+
+def var_test(var):
+    if isinstance(var, bool):
+        resp = var
+    elif isinstance(var, six.string_types):
+        if var.lower() in ['true']:
+            resp = True
+        else:
+            resp = False
+    else:
+        resp = False
+    return resp
 
 #############################################################################
 # Logging
 #############################################################################
 
-VERBOSE_LOG = os.getenv("VERBOSE_LOG", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
+VERBOSE_LOG = var_test(os.getenv("VERBOSE_LOG", False))
 FORMAT = '[%(asctime)s] %(name)s         [VERBOSE_LOG] %(message)s'
 
 logging.basicConfig(format=FORMAT)
@@ -62,10 +65,13 @@ AC_VULN = prometheus_client.Gauge(
     'Admission Controller vulnerabilities',
     ['exported_namespace', 'image', 'severity']
 )
-IN_CLUSTER = os.getenv("IN_CLUSTER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
-IS_GLOBAL = os.getenv("IS_GLOBAL", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
-AC_ENABLED = os.getenv("ADMISSION_CONTROLLER", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
-REDIS_ENABLED = os.getenv("REDIS_ENABLED", False) in ('true', '1', 'True', 't', 'yes', 'Yes')
+IN_CLUSTER = var_test(os.getenv("IN_CLUSTER", False))
+IS_GLOBAL = var_test(os.getenv("IS_GLOBAL", False))
+AC_ENABLED = var_test(os.getenv("ADMISSION_CONTROLLER", False))
+REDIS_ENABLED = var_test(os.getenv("REDIS_ENABLED", False))
+OFFLINE_ENABLED = var_test(os.getenv("SKIP_DB_UPDATE", False))
+DB_REPOSITORY_INSECURE = var_test(os.getenv("DB_REPOSITORY_INSECURE", False))
+
 if REDIS_ENABLED:
     REDIS_BACKEND = os.getenv("REDIS_BACKEND")
     if not REDIS_BACKEND:
@@ -74,6 +80,16 @@ if REDIS_ENABLED:
         MyLogger.warning("Redis Cache Disabled: %s" % (REDIS_BACKEND))
     else:
         MyLogger.warning("Redis Cache Enabled: %s" % (REDIS_BACKEND))
+    TRIVY_REDIS = ["--cache-backend", REDIS_BACKEND]
+
+if OFFLINE_ENABLED:
+    DB_REPOSITORY = os.getenv("DB_REPOSITORY")
+    if not DB_REPOSITORY:
+        TRIVY_OFFLINE = ["--skip-db-update", "--offline-scan"]
+    else:
+        TRIVY_OFFLINE = ["--db-repository", DB_REPOSITORY]
+        if DB_REPOSITORY_INSECURE:
+            os.environ['TRIVY_INSECURE'] = "true"
 
 #############################################################################
 # Pretasks
@@ -96,9 +112,6 @@ def sleepTillTopOfNextMinute():
     sleeptime = 60 - (t.second + t.microsecond/1000000.0)
     time.sleep(sleeptime)
 
-def str2bool(v):
-  return v in ("yes", "true", "t", "1", "True", True)
-
 def getCurretnTime():
   now = datetime.now().time() # time object
   return now
@@ -106,14 +119,24 @@ def getCurretnTime():
 """Download trivy cache """
 @kopf.on.startup()
 async def startup_fn_trivy_cache(logger, **kwargs):
-    if REDIS_ENABLED:
-        TRIVY_CACHE = ["trivy", "-q", "image", "--cache-backend", REDIS_BACKEND, "--download-db-only"]
+    if OFFLINE_ENABLED:
+        if DB_REPOSITORY:
+            TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
+            TRIVY_CACHE = TRIVY_CACHE + ["--db-repository", DB_REPOSITORY]
+            trivy_cache_result = (
+                subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
+            )
+            logger.info("Offline mode enabled, trivy cache created...")
+        else:
+            logger.info("Offline mode enabled, skipping cache update")
     else:
         TRIVY_CACHE = ["trivy", "-q", "image", "--download-db-only"]
-    trivy_cache_result = (
-        subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
-    )
-    logger.info("trivy cache created...")
+        if REDIS_ENABLED:
+            TRIVY_CACHE = TRIVY_CACHE + TRIVY_REDIS
+        trivy_cache_result = (
+            subprocess.check_output(TRIVY_CACHE).decode("UTF-8")
+        )
+        logger.info("trivy cache created...")
 
 """Start Prometheus Exporter"""
 @kopf.on.startup()
@@ -124,50 +147,104 @@ async def startup_fn_prometheus_client(logger, **kwargs):
 #############################################################################
 # Operator
 #############################################################################
-
-"""Scanner Creation"""
+# Namespace Scanner
+#############################################################################
 
 @kopf.on.create('trivy-operator.devopstales.io', 'v1', 'namespace-scanners')
 async def create_fn( logger, spec, **kwargs):
     logger.info("NamespaceScanner Created")
+
+    registry_list = []
+    secret_names = None
+    current_namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+    clusterWide = None
+    namespaceSelector = None
+    policyreport = None
+    defectdojo_host = None
+    defectdojo_api_key = None
+
+
+    if IN_CLUSTER:
+        k8s_config.load_incluster_config()
+    else:
+        k8s_config.load_kube_config()
+
+    v1 = k8s_client.CoreV1Api()
 
     try:
         crontab = spec['crontab']
         logger.debug("namespace-scanners - crontab:") # debuglog
         logger.debug(format(crontab)) # debuglog
     except:
-        logger.error("crontab must be set !!!")
-        raise kopf.PermanentError("crontab must be set")
+        logger.error("namespace-scanner: crontab must be set !!!")
+        raise kopf.PermanentError("namespace-scanner: crontab must be set")
 
-    clusterWide = None
     try:
-        clusterWide = str2bool(spec['clusterWide'])
+        clusterWide = var_test(spec['clusterWide'])
         logger.debug("namespace-scanners - clusterWide:") # debuglog
         logger.debug(format(clusterWide)) # debuglog
     except:
-        logger.info("clusterWide is not set, checking namespaceSelector")
+        logger.warning("clusterWide is not set, checking namespaceSelector")
         clusterWide = False
 
-    policyreport = None
     try:
-        policyreport = str2bool(spec['policyreport'])
-        logger.debug("namespace-scanners - policyreport:") # debuglog
+        policyreport = var_test(spec['integrations']['policyreport'])
+        logger.info("policyreport integration is configured")
+        logger.debug("namespace-scanners integrations - policyreport:") # debuglog
         logger.debug(format(policyreport)) # debuglog
     except:
-        logger.info("policyreport is not set")
+        logger.info("policyreport integration is not set")
         policyreport = False
 
-    namespaceSelector = None
+    try:
+        defectdojo_host = spec['integrations']['defectdojo']['host']
+        defectdojo_api_key = spec['integrations']['defectdojo']['api_key']
+        logger.info("defectdojo integration is configured")
+        logger.debug("namespace-scanners integrations - defectdojo:") # debuglog
+        logger.debug("host: " % format(defectdojo_host)) # debuglog
+        logger.debug("api_key: " % format(defectdojo_api_key)) # debuglog
+    except:
+        logger.info("defectdojo integration is not set")
+
     try:
         namespaceSelector = spec['namespace_selector']
         logger.debug("namespace-scanners - namespace_selector:") # debuglog
         logger.debug(format(namespaceSelector)) # debuglog
     except:
-        logger.info("namespace_selector is not set")
+        logger.warning("namespace_selector is not set")
+
+    try:
+        secret_names = spec['image_pull_secrets']
+        secret_names_present = True
+        logger.debug("image_pull_secrets:") # debuglog
+    except:
+        secret_names_present = False
+        logger.warning("image_pull_secrets is not set")
 
     if clusterWide == False and namespaceSelector is None:
         logger.error("Either clusterWide need to be set to 'true' or namespace_selector should be set")
         raise kopf.PermanentError("Either clusterWide need to be set to 'true' or namespace_selector should be set")
+
+    """Get auth data from pull secret"""
+    def pull_secret_decoder(secret_names, secret_namespace):
+        try:
+            registry_list = spec['registry']
+        except:
+            logger.debug("No registry auth config is defined.") # debug
+
+        for secret_name in secret_names:
+            try:
+                secret = v1.read_namespaced_secret(secret_name, secret_namespace)
+                secret_data = secret.data['.dockerconfigjson']
+                data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
+                registry_list.append(data['auths'])
+                logger.debug(format(data['auths'])) # debuglog
+            except ApiException as e:
+                logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
+                logger.debug("Exception when calling CoreV1Api->read_namespaced_secret: %s\n" % e) # debuglog
+
+    if secret_names_present:
+        pull_secret_decoder(secret_names, current_namespace)
 
     """Generate VulnerabilityReport"""
     def create_vulnerabilityreports(body, namespace, name):
@@ -188,7 +265,7 @@ async def create_fn( logger, spec, **kwargs):
             if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
                 logger.info("VulnerabilityReport %s already exists!!!" % name)
             else:
-                print("Exception when creating VulnerabilityReport - %s : %s\n" % (name, e))
+                logger.error("Exception when creating VulnerabilityReport - %s : %s\n" % (name, e))
 
     """Test VulnerabilityReport"""
     def get_vulnerabilityreports(namespace, name):
@@ -299,6 +376,7 @@ async def create_fn( logger, spec, **kwargs):
             tagged_ns_list = []
             policy_report = {}
 
+            """Find Namespaces"""
             namespace_list = k8s_client.CoreV1Api().list_namespace()
             logger.debug("namespace list begin:") # debuglog
             logger.debug(format(namespace_list)) # debuglog
@@ -329,6 +407,13 @@ async def create_fn( logger, spec, **kwargs):
                 """Find images in pods"""
                 for pod in namespaced_pod_list.items:
                     containers = pod.status.container_statuses
+                    if pod.spec.image_pull_secrets is not None:
+                        for item in pod.spec.image_pull_secrets:
+                            tmp = str(item)
+                            tmp = tmp.replace("\'", "\"")
+                            tmp2 = json.loads(tmp)
+                            tmp3 = [tmp2.get('name')]
+                            pull_secret_decoder(tmp3, tagged_ns)
                     try:
                         for image in containers:
                             pod_name = pod.metadata.name
@@ -390,29 +475,28 @@ async def create_fn( logger, spec, **kwargs):
                 logger.info("Scanning Image: %s" % (image_name))
 
                 registry = image_name.split('/')[0]
-                try:
-                    registry_list = spec['registry']
-
-                    for reg in registry_list:
-                        if reg['name'] == registry:
-                            os.environ['DOCKER_REGISTRY'] = reg['name']
-                            os.environ['TRIVY_USERNAME'] = reg['user']
-                            os.environ['TRIVY_PASSWORD'] = reg['password']
-                        elif not validators.domain(registry):
-                            """If registry is not an url"""
-                            if reg['name'] == "docker.io":
-                                os.environ['DOCKER_REGISTRY'] = reg['name']
-                                os.environ['TRIVY_USERNAME'] = reg['user']
-                                os.environ['TRIVY_PASSWORD'] = reg['password']
-                except:
-                    logger.debug("No registry auth config is defined.") # debug
+                for reg in registry_list:
+                    if  reg.get(registry):
+                        os.environ['DOCKER_REGISTRY'] = registry
+                        os.environ['TRIVY_USERNAME'] = reg[registry]['username']
+                        os.environ['TRIVY_PASSWORD'] = reg[registry]['password']
+                        if var_test(reg[registry]['insecure']):
+                            os.environ['TRIVY_INSECURE'] = "true"
+                    elif not validators.domain(registry):
+                        """If registry is not an url"""
+                        if reg.get("docker.io"):
+                            os.environ['DOCKER_REGISTRY'] = "docker.io"
+                            os.environ['TRIVY_USERNAME'] = reg['docker.io']['username']
+                            os.environ['TRIVY_PASSWORD'] = reg['docker.io']['password']
                     ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
                     logger.info("Active Registry: %s" % (ACTIVE_REGISTRY))
 
+                TRIVY = ["trivy", "-q", "image", "-f", "json"]
                 if REDIS_ENABLED:
-                    TRIVY = ["trivy", "-q", "image", "-f", "json", "--cache-backend", REDIS_BACKEND, image_name]
-                else:
-                    TRIVY = ["trivy", "-q", "image", "-f", "json", image_name]
+                    TRIVY = TRIVY + TRIVY_REDIS
+                if OFFLINE_ENABLED:
+                    TRIVY = TRIVY + TRIVY_OFFLINE
+                TRIVY = TRIVY + [image_name]
                 # --ignore-policy trivy.rego
 
                 res = subprocess.Popen(
@@ -425,23 +509,68 @@ async def create_fn( logger, spec, **kwargs):
                     if b"401" in error.strip():
                         logger.error(
                             "Repository: Unauthorized authentication required")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "Repository authentication required"
+                        }
                     elif b"UNAUTHORIZED" in error.strip():
                         logger.error(
                             "Repository: Unauthorized authentication required")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "Repository authentication required"
+                        }
                     elif b"You have reached your pull rate limit." in error.strip():
                         logger.error("You have reached your pull rate limit.")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "You have reached your pull rate limit"
+                        }
                     elif b"unsupported MediaType" in error.strip():
                         logger.error(
                             "Unsupported MediaType: see https://github.com/google/go-containerregistry/issues/377")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "Unsupported MediaType"
+                        }
                     elif b"MANIFEST_UNKNOWN" in error.strip():
                         logger.error("No tag in registry")
+                        trivy_result_list[image_name] = {
+                            "ERROR": "No tag in registry"
+                        }
                     else:
                         logger.error("%s" % (error.strip()))
-                    """Error action"""
-                    trivy_result_list[image_name] = "ERROR"
+                        trivy_result_list[image_name] = {
+                            "ERROR": "No tag in registry"
+                        }
                 elif output:
                     trivy_result = json.loads(output.decode("UTF-8"))
                     trivy_result_list[image_name] = trivy_result
+                    """DefectDojo Integration"""
+                    if defectdojo_host is not None and defectdojo_api_key is not None:
+                        DEFECTDOJO_AUTH_TOKEN = "Token " + defectdojo_api_key
+                        image_tag = image_name.split(':')[1]
+
+                        headers = dict()
+                        headers['Authorization'] = DEFECTDOJO_AUTH_TOKEN
+                        files = {
+                            'file': output.decode("UTF-8")
+                        }
+                        body = {
+                            'scan_date': datetime.now().strftime("%Y-%m-%d"),
+                            'active': True,
+                            'verified': False,
+                            'scan_type': "Trivy Scan",
+                            'product_type_name': "Container Image",
+                            'product_name': image_name.split(':')[0],
+                            'engagement_name': "trivy-operator",
+                            'version': image_tag,
+                            'auto_create_context': True, 
+                            'close_old_findings': True, # set the findings that are not present anymore to "inactive/mitigated"
+                        }
+
+                        response = requests.post(defectdojo_host+"/api/v2/import-scan/", headers=headers, files=files, data=body, verify=False)
+                        if response.status_code == 201 :
+                                logger.info("Successfully uploaded the results to DefectDojo")
+                        else:
+                                logger.info("Something went wrong wit push to DefectDojo, please debug " + str(response.text))
+
             logger.info("image list end:")
 
             MyLogger.info("result begin:") # WARNING
@@ -467,11 +596,10 @@ async def create_fn( logger, spec, **kwargs):
                 docker_tag = image_name.split(':')[-1]
 
                 trivy_result = trivy_result_list[image_name]
-                logger.debug(trivy_result) # debug
+                #logger.debug(trivy_result) # debug
                 vul_report[pod_name] = []
                 policy_report[pod_name] = []
-                if trivy_result == "ERROR":
-                    logger.debug("if trivy_result == ERROR:")
+                if list(trivy_result.keys())[0] == "ERROR":
                     vuls = {"UNKNOWN": 0, "LOW": 0,
                                 "MEDIUM": 0, "HIGH": 0,
                                 "CRITICAL": 0, "ERROR": 1,
@@ -486,9 +614,10 @@ async def create_fn( logger, spec, **kwargs):
                         "title": "Image Scanning Error",
                         "vulnerabilityID": ""
                     }
+                    report_message = "Image Scanning Error: " + str(list(trivy_result.values())[0])
                     report = {
                         "category": "Vulnerability Scan",
-                        "message": "Image Scanning Error",
+                        "message": report_message,
                         "policy": "Image Vulnerability",
                         "rule": "",
                         "properties": {
@@ -636,7 +765,6 @@ async def create_fn( logger, spec, **kwargs):
                             "category": "Vulnerability Scan",
                             "message": "There ins no vulnerability in this image",
                             "policy": "Image Vulnerability",
-                            "rule": item["VulnerabilityID"],
                             "properties": {
                                 "registry.server": docker_registry,
                                 "artifact.repository": docker_image,
@@ -699,10 +827,10 @@ async def create_fn( logger, spec, **kwargs):
                 vr_name += pod_name.split('_')[1]
                 # pod-[nginx]-container-[init]
 
-                MyLogger.info("Generate VR begin:") # DEBUG!
-                MyLogger.info(pod_name) # DEBUG!
-                logger.debug(vul_list[pod_name]) # debug
-                MyLogger.info("Generate VR end:") # DEBUG!
+                logger.debug("Generate VR begin:")  # DEBUG!
+                logger.debug("Creatting VR for %s" % pod_name) # DEBUG!
+                logger.debug(vul_list[pod_name]) # DEBUG!
+                logger.debug("Generate VR end:") # DEBUG!
 
                 vulnerabilityReport = {
                     "apiVersion": "trivy-operator.devopstales.io/v1",
@@ -792,6 +920,7 @@ async def create_fn( logger, spec, **kwargs):
                 else:
                     create_vulnerabilityreports(vulnerabilityReport, namespace, vr_name)
 
+                logger.debug("Generate PR begin:")
                 if policyreport:
                     is_policyreports_exists = get_policyreports(namespace, pr_name)
                     MyLogger.info("DEBUG - is_policyreports_exists: %s" % is_policyreports_exists) # WARNING
@@ -801,7 +930,9 @@ async def create_fn( logger, spec, **kwargs):
                         delete_policyreports(namespace, pr_name)
                         create_policyreports(policyReport, namespace, pr_name)
                     else:
+                        logger.error("policyreport dose not exists")
                         create_policyreports(policyReport, namespace, pr_name)
+                logger.debug("Generate PR end:")
 
 
             """Generate Metricfile"""
@@ -1025,22 +1156,37 @@ if AC_ENABLED:
         logger.info("Admission Controller is working")
         image_list = []
         vul_list = {}
-        registry_list = {}
+        registry_list = []
+        current_namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
 
         """Try to get Registry auth values"""
         if IN_CLUSTER:
             k8s_config.load_incluster_config()
         else:
             k8s_config.load_kube_config()
+        v1 = k8s_client.CoreV1Api()
         try:
             # if no namespace-scanners created
             nsScans = k8s_client.CustomObjectsApi().list_cluster_custom_object(
                 group="trivy-operator.devopstales.io",
                 version="v1",
                 plural="namespace-scanners",
-            )
+            )           
             for nss in nsScans["items"]:
-                registry_list = nss["spec"]["registry"]
+                if nss["spec"]["registry"]:
+                    registry_list = nss["spec"]["registry"]
+                if nss["spec"]['image_pull_secrets']:
+                    secret_names = spec['image_pull_secrets']
+                    for secret_name in secret_names:
+                        try:
+                            secret = v1.read_namespaced_secret(secret_name, current_namespace)
+                            secret_data = secret.data['.dockerconfigjson']
+                            data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
+                            registry_list.append(data['auths'])
+                            logger.debug(format(data['auths'])) # debuglog
+                        except ApiException as e:
+                            logger.error("%s secret dose not exist in namespace %s" % (secret_name, current_namespace))
+                            logger.debug("Exception when calling CoreV1Api->read_namespaced_secret: %s\n" % e) # debuglog
         except:
             logger.info("No ns-scan object created yet.")
 
@@ -1074,26 +1220,30 @@ if AC_ENABLED:
             """Login to registry"""
             try:
                 for reg in registry_list:
-                    if reg['name'] == registry:
-                        os.environ['DOCKER_REGISTRY'] = reg['name']
-                        os.environ['TRIVY_USERNAME'] = reg['user']
-                        os.environ['TRIVY_PASSWORD'] = reg['password']
+                    if reg.get(registry):
+                        os.environ['DOCKER_REGISTRY'] = registry
+                        os.environ['TRIVY_USERNAME'] = reg[registry]['username']
+                        os.environ['TRIVY_PASSWORD'] = reg[registry]['password']
+                        if var_test(reg[registry]['insecure']):
+                            os.environ['TRIVY_INSECURE'] = "true"
                     elif not validators.domain(registry):
                         """If registry is not an url"""
-                        if reg['name'] == "docker.io":
-                            os.environ['DOCKER_REGISTRY'] = reg['name']
-                            os.environ['TRIVY_USERNAME'] = reg['user']
-                            os.environ['TRIVY_PASSWORD'] = reg['password']
+                        if reg.get("docker.io"):
+                            os.environ['DOCKER_REGISTRY'] = "docker.io"
+                            os.environ['TRIVY_USERNAME'] = reg[registry]['username']
+                            os.environ['TRIVY_PASSWORD'] = reg[registry]['password']
             except:
                 logger.info("No registry auth config is defined.") # info
             ACTIVE_REGISTRY = os.getenv("DOCKER_REGISTRY")
             logger.debug("Active Registry: %s" % (ACTIVE_REGISTRY)) # debuglog
 
             """Scan Images"""
+            TRIVY = ["trivy", "-q", "image", "-f", "json"]
             if REDIS_ENABLED:
-                TRIVY = ["trivy", "-q", "image", "-f", "json", "--cache-backend", REDIS_BACKEND, image_name]
-            else:
-                TRIVY = ["trivy", "-q", "image", "-f", "json", image_name]
+                TRIVY = TRIVY + TRIVY_REDIS
+            if OFFLINE_ENABLED:
+                TRIVY = TRIVY + TRIVY_OFFLINE
+            TRIVY = TRIVY + [image_name]
             # --ignore-policy trivy.rego
 
             res = subprocess.Popen(
@@ -1102,12 +1252,12 @@ if AC_ENABLED:
             if error:
                 """Error Logging"""
                 logger.error("TRIVY ERROR: return %s" % (res.returncode))
-                if b"401" in error.strip():
-                    logger.error(
-                        "Repository: Unauthorized authentication required")
+                if b"unknown tag" in error.strip():
+                    logger.error("Repository: No tag in registry")
+                elif b"401" in error.strip():
+                    logger.error("Repository: Unauthorized authentication required")
                 elif b"UNAUTHORIZED" in error.strip():
-                    logger.error(
-                        "Repository: Unauthorized authentication required")
+                    logger.error("Repository: Unauthorized authentication required")
                 elif b"You have reached your pull rate limit." in error.strip():
                     logger.error("You have reached your pull rate limit.")
                 elif b"unsupported MediaType" in error.strip():
@@ -1116,7 +1266,7 @@ if AC_ENABLED:
                 elif b"MANIFEST_UNKNOWN" in error.strip():
                     logger.error("No tag in registry")
                 else:
-                    logger.error("%s" % (error.strip()))
+                    logger.error("%s" % str(error.strip().decode("utf-8")))
                 """Error action"""
                 se = {"ERROR": 1}
                 vul_list[image_name] = [se, namespace]
@@ -1167,6 +1317,170 @@ if AC_ENABLED:
                     else:
                         #                    logger.info("%s is ok" % (sev)) # Debug
                         continue
+
+#############################################################################
+# ClustereScanner
+#############################################################################
+@kopf.on.resume('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
+@kopf.on.create('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
+async def startup_sc_deployer( logger, spec, **kwargs):
+    logger.info("ClustereScanner Created")
+
+    ds_name = "kube-bech-scanner"
+    ds_image = "devopstales/kube-bench-scnner:2.5"
+    pod_name = os.environ.get("POD_NAME")
+    pod_uid = os.environ.get("POD_UID")
+    namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+
+    try:
+        service_account = os.environ.get("SERVICE_ACCOUNT")
+    except:
+        service_account = None
+        logger.info("ClustereScannerProfile is not configured")
+        raise kopf.AdmissionError("ClustereScannerProfile is not configured")
+
+    try:
+        scan_profile = spec['scanProfileName']
+        logger.info("ClustereScannerProfile is set to %s" % scan_profile)
+    except:
+        scan_profile = None
+        logger.info("serviceAccountName is not in environment variables")
+
+    daemonset = {
+        "apiVersion": "apps/v1",
+        "kind": "DaemonSet",
+        "metadata": { 
+            "name": ds_name, 
+            "labels": { "app": ds_name },
+            "annotations": { "prometheus.io/port": "9115", "prometheus.io/scrape": "true" }
+        },
+        "spec": {
+            "selector": { "matchLabels": { "app": ds_name, } },
+            "template": { 
+                "metadata": { "labels": { "app": ds_name, } },
+                "spec": { 
+                    "hostPID": True,
+                    "serviceAccountName": service_account,
+                    "containers": [ {
+                        "name": ds_name,
+                        "image": ds_image,
+                        "ports": [ { "containerPort": 9115 } ],
+                        "env": [ { "name": "NODE_NAME", "valueFrom": { "fieldRef": { "fieldPath": "spec.nodeName" } } } ],
+                    } ],
+                },
+            }
+        },
+    }
+
+    if pod_name:
+        daemonset['metadata']['ownerReferences'] = [ { "apiVersion": "v1", "kind": "Pod", "name": pod_name, "uid": pod_uid, "blockOwnerDeletion": False, "controller": True, } ]
+
+    daemonset['spec']['template']['spec']['containers'][0]['volumeMounts'] = [
+        { "name": "var-lib-etcd", "mountPath": "/var/lib/etcd", "readOnly": True },
+        { "name": "var-lib-kubelet", "mountPath": "/var/lib/kubelet", "readOnly": True },
+        { "name": "var-lib-kube-scheduler", "mountPath": "/var/lib/kube-scheduler", "readOnly": True },
+        { "name": "var-lib-kube-controller-manager", "mountPath": "/var/lib/kube-controller-manager", "readOnly": True },
+        { "name": "etc-systemd", "mountPath": "/etc/systemd", "readOnly": True },
+        { "name": "lib-systemd", "mountPath": "/lib/systemd/", "readOnly": True },
+        { "name": "srv-kubernetes", "mountPath": "/srv/kubernetes/", "readOnly": True },
+        { "name": "etc-kubernetes", "mountPath": "/etc/kubernetes", "readOnly": True },
+        { "name": "usr-bin", "mountPath": "/usr/local/mount-from-host/bin", "readOnly": True },
+        { "name": "etc-cni-netd", "mountPath": "/etc/cni/net.d/", "readOnly": True },
+        { "name": "opt-cni-bin", "mountPath": "/opt/cni/bin/", "readOnly": True },
+        { "name": "etc-passwd", "mountPath": "/etc/passwd", "readOnly": True },
+        { "name": "etc-group", "mountPath": "/etc/group", "readOnly": True },
+    ]
+    daemonset['spec']['template']['spec']['volumes'] = [
+        { "name": "var-lib-etcd", "hostPath": { "path": "/var/lib/etcd" } },
+        { "name": "var-lib-kubelet", "hostPath": { "path": "/var/lib/kubelet" } },
+        { "name": "var-lib-kube-scheduler", "hostPath": { "path": "/var/lib/kube-scheduler" } },
+        { "name": "var-lib-kube-controller-manager", "hostPath": { "path": "/var/lib/kube-controller-manager" } },
+        { "name": "etc-systemd", "hostPath": { "path": "/etc/systemd" } },
+        { "name": "lib-systemd", "hostPath": { "path": "/lib/systemd" } },
+        { "name": "srv-kubernetes", "hostPath": { "path": "/srv/kubernetes" } },
+        { "name": "etc-kubernetes", "hostPath": { "path": "/etc/kubernetes" } },
+        { "name": "usr-bin", "hostPath": { "path": "/usr/bin" } },
+        { "name": "etc-cni-netd", "hostPath": { "path": "/etc/cni/net.d/" } },
+        { "name": "opt-cni-bin", "hostPath": { "path": "/opt/cni/bin/" } },
+        { "name": "etc-passwd", "hostPath": { "path": "/etc/passwd" } },
+        { "name": "etc-group", "hostPath": { "path": "/etc/group" } },
+    ]
+
+    """Test daemonset"""
+    def test_daemonset_exists(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.AppsV1Api(api_client)
+        try:
+            api_response = api_instance.read_namespaced_daemon_set(
+                name, namespace )
+            return True
+        except ApiException as e:
+            if e.status != 404:
+                logger.error("Exception when testing daemonset - %s : %s\n" % (name, e))
+                return False
+            else:
+                return False
+
+    """Generate daemonset"""
+    def create_daemonset(body, namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.AppsV1Api(api_client)
+            pretty = 'true'
+            field_manager = 'trivy-operator'
+            body = body
+            namespace = namespace
+        try:
+            api_response = api_instance.create_namespaced_daemon_set(
+                namespace, body, pretty=pretty,  field_manager=field_manager)
+        except ApiException as e:
+            if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
+                logger.info("daemonset %s already exists!!!" % name)
+            else:
+                logger.error("Exception when creating daemonset - %s : %s\n" % (name, e))
+
+    is_daemonset_exists = test_daemonset_exists(namespace, ds_name)
+
+    if is_daemonset_exists:
+        logger.info("daemonset already exists") # WARNING
+    else:
+        create_daemonset(daemonset, namespace, ds_name)
+
+@kopf.on.delete('trivy-operator.devopstales.io', 'v1', 'cluster-scanners')
+async def startup_sc_deleter( logger, spec, **kwargs):
+    ds_name = "kube-bech-scanner"
+    namespace = os.environ.get("POD_NAMESPACE", "trivy-operator")
+
+    """Test daemonset"""
+    def test_daemonset_exists(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.AppsV1Api(api_client)
+        try:
+            api_response = api_instance.read_namespaced_daemon_set(
+                name, namespace )
+            return True
+        except ApiException as e:
+            if e.status != 404:
+                logger.error("Exception when testing daemonset - %s : %s\n" % (name, e))
+                return False
+            else:
+                return False
+
+    """Delete daemonset"""
+    def delete_daemonset(namespace, name):
+        with k8s_client.ApiClient() as api_client:
+            api_instance = k8s_client.AppsV1Api(api_client)
+        try:
+            api_response = api_instance.delete_namespaced_daemon_set(
+                name, namespace)
+        except ApiException as e:
+            logger.error("Exception when deleting daemonset - %s : %s\n" % (name, e))
+
+    is_daemonset_exists = test_daemonset_exists(namespace, ds_name)
+
+    if is_daemonset_exists:
+        delete_daemonset(namespace, ds_name)
+    else:
+        logger.info("daemonset dose not exists: nothing to delete") # WARNING
 
 #############################################################################
 # print to operator log

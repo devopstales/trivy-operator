@@ -49,4 +49,4 @@ ac_vulnerabilities{exported_namespace="trivytest",image="nginxinc/nginx-unprivil
 ac_vulnerabilities{exported_namespace="trivytest",image="nginxinc/nginx-unprivileged:latest",severity="CRITICAL"} 4.0
 ```
 
-![trivy-exporter](../../img/trivy-exporter.png)
+![trivy-exporter](../img/trivy-exporter.png)

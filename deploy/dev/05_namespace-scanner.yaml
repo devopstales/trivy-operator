@@ -1,0 +1,20 @@
+apiVersion: trivy-operator.devopstales.io/v1
+kind: NamespaceScanner
+metadata:
+  name: main-config
+spec:
+  crontab: "*/1 * * * *"
+  namespace_selector: "trivy-scan"
+  clusterWide: False
+  integrations:
+    policyreport: True
+#    defectdojo:
+#      host: "https://defectdojo.k8s.intra"
+#      api_key: "xyz456ucdssd67sd67dsg"
+  image_pull_secrets:
+    - devopstales-dockerhub
+#  registry:
+#  - name: docker.io
+#    username: "devopstales"
+#    password: ""
+#    insecure: True

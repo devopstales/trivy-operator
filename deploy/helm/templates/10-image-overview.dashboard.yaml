@@ -1,0 +1,21 @@
+{{- if $.Values.grafana.dashboards.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "trivy-operator.fullname" . }}-image-overview-dashboard
+  {{ if .Values.grafana.namespace }}
+  namespace: {{ .Values.grafana.namespace }}
+  {{ else }}
+  namespace: {{ .Release.Namespace }}
+  {{ end }}
+  annotations:
+    {{ .Values.grafana.folder.annotation }}: {{ .Values.grafana.folder.name }}
+  labels:
+    serviceapp: {{ include "trivy-operator.fullname" . }}-trivy-operator
+    {{ .Values.grafana.dashboards.label }}: {{ .Values.grafana.dashboards.value | quote }}
+    {{- with .Values.serviceMonitor.labels }}
+        {{- toYaml . | nindent 4 }}
+    {{- end }}
+data:
+{{ (.Files.Glob "namespace-image-overview.json").AsConfig | indent 2 }}
+{{- end }}

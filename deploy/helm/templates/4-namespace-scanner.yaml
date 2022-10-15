@@ -8,10 +8,28 @@ spec:
   crontab: "{{ .Values.namespaceScanner.crontab }}"
   namespace_selector: "{{ .Values.namespaceScanner.namespaceSelector }}"
   clusterWide: {{ .Values.namespaceScanner.clusterWide | default "false" }}
-  policyreport: {{ .Values.namespaceScanner.policyreport | default "false" }}
+  {{- if .Values.namespaceScanner.integrations }}
+  integrations:
+  {{- if .Values.namespaceScanner.integrations.policyreport }}
+    policyreport: {{ .Values.namespaceScanner.integrations.policyreport | default "false" }}
+  {{- end }}
+  {{- if .Values.namespaceScanner.integrations.defectdojo }}
+  {{- with .Values.namespaceScanner.integrations.defectdojo }}
+    defectdojo:
+  {{- toYaml . | nindent 6 }}
+  {{- end }}
+  {{- end }}
   {{- if .Values.registryAuth.enabled }}
+  {{- if .Values.registryAuth.image_pull_secrets }}
+  {{- with .Values.registryAuth.image_pull_secrets }}
+  image_pull_secrets:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.registryAuth.registry }}
   {{- with .Values.registryAuth.registry }}
   registry:
   {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- end }}
   {{- end }}
