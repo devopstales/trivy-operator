@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block header %}
+    <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+{% endblock %}
+
+{% block content %}
+{% if get_flashed_messages() %}
+{% for category, message in get_flashed_messages(with_categories=true) %}
+<div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+  {{ message }}
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Page Heading -->
+<nav class="navbar navbar-light bg-light row">
+  <div class="col"></div>
+  <!-- Button trigger modal add -->
+  {% if username_role == "Admin" %}
+  <button type="button" class="btn btn-success float-right col-1 me-lg-4" data-toggle="modal" data-target="#modaladd">
+    Add User
+  </button>
+  {% endif %}
+
+  <!-- Modal Add User -->
+  <div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modaladdLabel">Create User</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form action="/users/add" method="POST">
+            <div class="form-group">
+              <label>Name:</label>
+              <input class="form-control user" name="username" type="text" placeholder="Type your username">
+            </div>
+            <div class="form-group">
+              <label>Email:</label>
+              <input class="form-control user" name="email" type="text" placeholder="Type your email">
+            </div>
+            <div class="form-group">
+              <label>Password:</label>
+              <input type="password" name="password" id="PassEntry" class="form-control user" placeholder="Type your password">
+            </div>
+
+            <div class="form-group">
+              <label>Role:</label>
+              <select class="form-select" aria-label="Select role" name="role">
+                <option value="User">User</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </div>
+            <div class="modal-footer">
+              <div class="form-group mt-2">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary" >Add User</button>
+              </div>
+            </div>
+          </form>
+        </div>
+    </div>
+  </div>
+  <!-- Modal Add User -->
+
+</nav>
+
+<!-- DataTales Example -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">User List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Type</th>
+                      <th>Action</th>
+                    </tr>
+                </thead>
+                <tfoot>
+                    <tr>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Type</th>
+                      <th>Action</th>
+                    </tr>
+                </tfoot>
+                <tbody>
+                  {% for user in users %}
+                  <tr>
+                    {% if user.username == current_username %}
+                    <td>
+                      <a href="/users/privileges/{{ user.username }}">{{ user.username }}</a>
+                    </td>
+                    {% else %}
+                    <td>{{ user.username }}</td>
+                    {% endif %}
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.role }}</td>
+                    <td>{{ user.user_type }}</td>
+                    <td>
+                      {% if username_role == "Admin" and user.username != "admin" %}
+                      <!-- Button trigger modal edit -->
+                      <form action="/users/delete" method="post">
+                          <button type="button" class="btn btn-warning btn-xs" data-toggle="modal" data-target="#modaledit{{ user.id }}" data-user="{{ user.username }}" data-role="{{ user.role }}">Edit</button>
+                          {% if user.username != username %}
+                          <input type="hidden"  name="username" value="{{ user.username }}"/>
+                          <input type="submit" class="btn btn-danger btn-xs" name="upvote" value="Delete" />
+                          {% endif %}
+                      </form>          
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit User -->
+{% for user in users %}
+<div class="modal fade" id="modaledit{{ user.id }}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modaleditLabel">Update Information</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form action="" method="POST">
+          <div class="form-group">
+            <label>Name:</label>
+            <input class="form-control" name="username" type="text" value="{{ user.username }}">
+          </div>
+          <div class="form-group">
+            <label>Dashboard Role:</label>
+            <select class="form-select" aria-label="Select role" name="role">
+              <option value="User">User</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            {% if user.user_type == "OpenID" %}
+            <hr class="mt-2 mb-3"/>
+            <h6 class="modal-title mt-2 mb-2">Privileges</h6>
+            <div class="bg-gray-100  border rounded py-3 px-4 mb-3" >
+              <div>
+                <div class="flex items-center">
+                  <!-- front -->
+                  <div class="flex-auto">
+                    <div style="display: flex;">
+                      <div style="flex: 3 1 0%;" data-testid="template-select">
+                        <!--1-->
+                        <label>template</label>
+                        <select class="form-select" aria-label="Select template" name="user_namespaced_role_1">
+                          <option value="none">None</option>
+                          {% for user_role in user_role_template_list %}
+                          <option value="{{ user_role }}">{{ user_role }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div style="margin-left: 20px; flex: 3 1 0%;" data-testid="namespaces-select">
+                        <!--2-->
+                        <label><span class="pr-1">*</span>namespaces</label>
+                        <select class="selectpicker" multiple aria-label="size 3 select example" name="user_namespaces_1">
+                          {% for ns in namespace_list %}
+                          <option value="{{ ns }}">{{ ns }}</option>
+                          {% endfor %}
+                        </select>
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" name="user_all_namespaces_1">
+                          <label class="form-check-label" for="flexCheckDefault" value="True">all Namespaces</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- hidden -->
+                  <hr id="hiddenHR" style="display: none;">
+                  <div class="flex-auto" id="hiddenDIV" style="display: none;">
+                    <div style="display: flex;">
+                      <div style="flex: 3 1 0%;" data-testid="template-select">
+                        <!--1-->
+                        <label>template</label>
+                        <select class="form-select" aria-label="Select template" name="user_namespaced_role_2">
+                          <option value="none">None</option>
+                          {% for user_role in user_role_template_list %}
+                          <option value="{{ user_role }}">{{ user_role }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div style="margin-left: 20px; flex: 3 1 0%;" data-testid="namespaces-select">
+                        <!--2-->
+                        <label><span class="pr-1">*</span>namespaces</label>
+                        <select class="selectpicker" multiple aria-label="size 3 select example" name="user_namespaces_2">
+                          {% for ns in namespace_list %}
+                          <option value="{{ ns }}">{{ ns }}</option>
+                          {% endfor %}
+                        </select>
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" name="user_all_namespaces_2">
+                          <label class="form-check-label" for="flexCheckDefault" value="True">all Namespaces</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <hr>
+                  <button class="py-2 px-6 btn btn-outline-secondary" type="button" onclick="unHide()" id="addBTN">add</button>
+                </div>
+              </div>
+            </div>
+            <div class="block uppercase font-bold mb-2">access to cluster resouces (non-namespaced):</div>
+            <select class="form-select" aria-label="Select template" name="user_cluster_role">
+              <option value="none">None</option>
+              {% for user_clusterRole in user_clusterRole_template_list %}
+              <option value="{{ user_clusterRole }}">{{ user_clusterRole }}</option>
+              {% endfor %}
+            </select>
+            {% endif %}
+            <div class="modal-footer mt-2">
+              <div class="form-group">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary" >Save changes</button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+<!-- Modal Edit User -->
+
+{% endblock %}
+
+{% block scripts %}
+    <script>
+      function unHide() {
+        var x = document.getElementById("hiddenDIV");
+        if (x.style.display === "none") {
+          x.style.display = "block";
+        } else {
+          x.style.display = "none";
+        }
+        var y = document.getElementById("hiddenHR");
+        if (y.style.display === "none") {
+          y.style.display = "block";
+        } else {
+          y.style.display = "none";
+        }
+        if ( document.getElementById("addBTN").classList.contains('btn-outline-secondary') ) {
+          document.getElementById("addBTN").classList.remove('btn-outline-secondary');
+          document.getElementById("addBTN").classList.add('btn-outline-danger');
+          document.getElementById("addBTN").innerHTML = 'delete';
+        } else {
+          document.getElementById("addBTN").classList.remove('btn-outline-danger');
+          document.getElementById("addBTN").classList.add('btn-outline-secondary');
+          document.getElementById("addBTN").innerHTML = 'add';
+        }
+      };
+    </script>
+
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
+    <script src="{{ url_for('static',filename='vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
+{% endblock %}

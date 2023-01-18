@@ -32,7 +32,7 @@ jobs:
       - name: Prepare trivy
         id: prep_trivy
         run: |
-          cp trivy-operator.py docker/trivy-operator/trivy-operator.py
+          cp src/trivy-operator/trivy-operator.py docker/trivy-operator/trivy-operator.py
           # amd64
           wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v${{env.TRIVY}}/trivy_${{env.TRIVY}}_Linux-64bit.tar.gz
           tar -C /tmp -xf /tmp/trivy.tar.gz
@@ -48,7 +48,7 @@ jobs:
       - name: Prepare kube-bench
         id: prep_kube-bench
         run: |
-          cp kube-bench-scnner.py docker/kube-bench-scnner/kube-bench-scnner.py
+          cp src/trivy-operator/kube-bench-scnner.py docker/kube-bench-scnner/kube-bench-scnner.py
           # amd64 kube-bench
           wget -q -O /tmp/kube-bench.tar.gz https://github.com/aquasecurity/kube-bench/releases/download/v${{env.BENCH}}/kube-bench_${{env.BENCH}}_linux_amd64.tar.gz
           tar -C /tmp -xf /tmp/kube-bench.tar.gz
