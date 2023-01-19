@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block header %}
+{% endblock %}
+
+{% block content %}
+{% if get_flashed_messages() %}
+{% for category, message in get_flashed_messages(with_categories=true) %}
+<div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+  {{ message }}
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% endfor %}
+{% endif %}
+
+<nav class="navbar navbar-light bg-light row"></nav>
+
+<div class="card shadow mb-4">
+  <form action="/sso-config" method="POST">
+    <div class="form-group">
+      <label for="oauth_server_uri">Identity Provider URL</label>
+      {% if oauth_server_uri %}
+      <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="{{ oauth_server_uri }}">
+      {% else %}
+      <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="URL">
+      {% endif %}
+    </div>
+    <div class="row">
+      <div class="col">
+        <label for="client_id">Identity Provider Client Config</label>
+        {% if client_id %}
+        <input type="text" class="form-control" id="client_id" name="client_id" placeholder="{{ client_id }}">
+        {% else %}
+        <input type="text" class="form-control" id="client_id" name="client_id" placeholder="Client ID">
+        {% endif %}
+      </div>
+      <div class="col">
+        {% if client_secret %}
+        <input type="text" class="form-control" id="client_secret" name="client_secret" placeholder="{{ client_secret }}">
+        {% else %}
+        <input type="text" class="form-control" id="client_secret" name="client_secret" placeholder="Client Secret">
+        {% endif %}
+      </div>
+    </div>
+    <div class="form-group mt-2">
+      <button type="submit" class="btn btn-primary" >Add</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

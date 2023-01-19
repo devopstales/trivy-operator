@@ -3,6 +3,7 @@
 from __main__ import app
 import requests, json, yaml, re
 from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete
+from functions.sso import SSOUserCreate, SSOUserGet
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -120,3 +121,46 @@ def users_delete():
 ##############################################################
 ## SSO Settings
 ##############################################################
+
+@app.route('/sso-config', methods=['GET', 'POST'])
+@login_required
+def sso_config():
+    if request.method == 'POST':
+        oauth_server_uri = request.form['oauth_server_uri']
+        client_id = request.form['client_id']
+        client_secret = request.form['client_secret']
+#        base_uri = request.form['base_uri']
+#        scope = request.form['scope']
+
+        base_uri = "http://localhost:5000"
+        scope = [
+            "openid",          # mandatory for OpenIDConnect auth
+            "email",           # smallest and most consistent scope and claim
+            "offline_access",  # needed to actually ask for refresh_token
+            "good-service",
+            "profile",
+        ]
+
+        SSOUserCreate(oauth_server_uri, client_id, client_secret, base_uri, scope)
+        flash("SSO Server Updated Successfully", "success")
+        return render_template(
+            'sso.html',
+            oauth_server_uri=oauth_server_uri,
+            client_id=client_id,
+            client_secret=client_secret,
+            base_uri=base_uri,
+            scope=scope,
+        )
+    else:
+        ssoUsers = SSOUserGet()
+        if ssoUsers is None:
+            return render_template('sso.html')
+        else:
+            return render_template(
+                'sso.html',
+                oauth_server_uri=ssoUsers.oauth_server_uri,
+                client_id=ssoUsers.client_id,
+                client_secret=ssoUsers.client_secret,
+                base_uri=ssoUsers.base_uri,
+                scope=ssoUsers.scope,
+            )
