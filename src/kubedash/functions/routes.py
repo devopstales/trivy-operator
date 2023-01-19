@@ -5,6 +5,7 @@ import requests, json, yaml, re
 from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
     UserCreateSSO
 from functions.sso import SSOUserCreate, SSOSererGet, get_auth_server_info
+from functions.k8s import k8sConfigCreate
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -208,21 +209,39 @@ def callback():
 
         token = oauth.fetch_token(
             token_url,
-            authorization_response=request.url,
-            client_secret=ssoServer.client_secret,
-            timeout=60,
-            verify=False,
+            authorization_response = request.url,
+            client_secret = ssoServer.client_secret,
+            timeout = 60,
+            verify = False,
         )
         user_data = oauth.get(
             userinfo_url,
-            timeout=60,
-            verify=False,
+            timeout = 60,
+            verify = False,
         ).json()
 
         if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
             remote_addr = request.remote_addr
         else:
             remote_addr = request.environ['HTTP_X_FORWARDED_FOR']
+
+## Kubectl config
+#        try:
+#            x = requests.post('http://%s:8080/' % remote_addr, json={
+#                "context": k8s_context,
+#                "server": k8s_server_url,
+#                "certificate-authority-data": k8s_server_ca,
+#                "client-id": ssoServer.client_id,
+#                "id-token": token["id_token"],
+#                "refresh-token": token.get("refresh_token"),
+#                "idp-issuer-url": ssoServer.oauth_server_uri,
+#                "client_secret": ssoServer.client_secret,
+#                }
+#            )
+#            app.logger.info("Config sent to client")
+#            app.logger.info("Answer from clinet: %s" % x.text)
+#        except:
+#            app.logger.error ("Kubectl print back error")
 
         session['oauth_token'] = token
         session['refresh_token'] = token.get("refresh_token")
@@ -235,3 +254,40 @@ def callback():
             user = User.query.filter_by(username=username, user_type = "OpenID").first()
         login_user(user)
         return redirect(url_for('users'))
+
+##############################################################
+## Kubectl config
+##############################################################
+
+@app.route('/dtlogin')
+def index():
+    oauth, auth_server_info = get_auth_server_info()
+    auth_url = auth_server_info["authorization_endpoint"]
+
+    authorization_url, state = oauth.authorization_url(
+        auth_url,
+        access_type="offline",  # not sure if it is actually always needed,
+                                # may be a cargo-cult from Google-based example
+    )
+    session['oauth_state'] = state
+    return redirect(authorization_url)
+
+@app.route('/k8s-config', methods=['GET', 'POST'])
+@login_required
+def k8s_config():
+    if request.method == 'POST':
+        k8s_server_url = request.form['k8s_server_url']
+        k8s_context = request.form['k8s_context']
+        k8s_server_ca = request.form['k8s_server_ca']
+
+        k8sConfigCreate(k8s_server_url, k8s_context, k8s_server_ca)
+        flash("Kubernetes Config Updated Successfully", "success")
+
+        return render_template(
+            'k8s.html',
+            k8s_server_url = k8s_server_url,
+            k8s_context = k8s_context,
+            k8s_server_ca = k8s_server_ca,
+        )
+    else:
+        return render_template('k8s.html')

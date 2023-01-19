@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block header %}
+{% endblock %}
+
+{% block content %}
+{% if get_flashed_messages() %}
+{% for category, message in get_flashed_messages(with_categories=true) %}
+<div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+  {{ message }}
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% endfor %}
+{% endif %}
+
+<nav class="navbar navbar-light bg-light row"></nav>
+
+<div class="card shadow mb-4">
+    <form action="/k8s-config" method="POST">
+        <div class="form-group">
+            <label for="k8s_server_url">Kubernetes API URL</label>
+            {% if k8s_server_url %}
+            <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="{{ k8s_server_url }}">
+            {% else %}
+            <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="URL">
+            {% endif %}
+        </div>
+        <div class="form-group">
+            <label for="k8s_context">Kubernetes Config Context</label>
+            {% if k8s_context %}
+            <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="{{ k8s_context }}">
+            {% else %}
+            <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="URL">
+            {% endif %}
+        </div>
+        <div class="form-group">
+            <label for="k8s_server_ca">Kubernetes CA Certificate</label>
+            {% if k8s_server_ca %}
+            <textarea class="form-control" id="k8s_server_ca" rows="3">{{ k8s_server_ca }}</textarea>
+            {% else %}
+            <textarea class="form-control" id="k8s_server_ca" rows="3"></textarea>
+            {% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% endblock %}
