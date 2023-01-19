@@ -67,3 +67,6 @@ def UserDelete(username):
     if user:
         db.session.delete(user)
         db.session.commit()
+
+def UserCreateSSO(username, email, tokens, user_type):
+    UserCreate(username, None, email, "User", user_type, tokens)

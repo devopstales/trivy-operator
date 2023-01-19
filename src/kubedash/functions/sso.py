@@ -4,6 +4,7 @@ from __main__ import db, login_manager
 from flask_login import UserMixin
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy import PickleType
+from requests_oauthlib import OAuth2Session
 
 ##############################################################
 ## functions
@@ -35,5 +36,28 @@ def SSOUserCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes):
         db.session.add(sso_data)
         db.session.commit()
 
-def SSOUserGet():
+def SSOSererGet():
     return Openid.query.get(1)
+
+def get_auth_server_info():
+    ssoServer = SSOSererGet()
+    redirect_uri = ssoServer.base_uri+"/callback"
+    oauth = OAuth2Session(
+        ssoServer.client_id,
+        redirect_uri = redirect_uri,
+#        scope = list(ssoServer.scope)
+        scope = [
+            "openid",          # mandatory for OpenIDConnect auth
+            "email",           # smallest and most consistent scope and claim
+            "offline_access",  # needed to actually ask for refresh_token
+            "good-service",
+            "profile",
+        ]
+    )
+    auth_server_info = oauth.get(
+        f"{ssoServer.oauth_server_uri}/.well-known/openid-configuration",
+        withhold_token=True,
+        verify=False
+    ).json()
+
+    return oauth, auth_server_info

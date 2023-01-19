@@ -16,6 +16,6 @@ class dbCreate():
         UserCreate(username, password, email, role, user_type, tokens)
     else:
         with app.app_context():
-        	db.create_all()
-	        UserCreate(username, password, email, role, user_type, tokens)
+            db.create_all()
+            UserCreate(username, password, email, role, user_type, tokens)
 

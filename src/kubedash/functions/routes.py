@@ -2,8 +2,9 @@
 
 from __main__ import app
 import requests, json, yaml, re
-from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete
-from functions.sso import SSOUserCreate, SSOUserGet
+from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
+    UserCreateSSO
+from functions.sso import SSOUserCreate, SSOSererGet, get_auth_server_info
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -29,7 +30,28 @@ def health():
 
 @app.route('/')
 def login():
-        return render_template('login.html')
+        is_sso_enabled = False
+        is_ldap_enabled = False
+        authorization_url = None
+
+        ssoServer = SSOSererGet()
+        if ssoServer is not None:
+            oauth, auth_server_info = get_auth_server_info()
+            auth_url = auth_server_info["authorization_endpoint"]
+            authorization_url, state = oauth.authorization_url(
+                auth_url,
+                access_type="offline",  # not sure if it is actually always needed,
+                                        # may be a cargo-cult from Google-based example
+            )
+            session['oauth_state'] = state
+            is_sso_enabled = True
+
+        return render_template(
+            'login.html',
+            sso_enabled = is_sso_enabled,
+            ldap_enabled = is_ldap_enabled,
+            auth_url = authorization_url
+        )
 
 @app.route('/', methods=['POST'])
 def login_post():
@@ -52,6 +74,10 @@ def login_post():
 @login_required
 def logout():
     logout_user()
+    try:
+        session.pop('oauth_token')
+    except:
+        print()
     return redirect(url_for('login'))
 
 ##############################################################
@@ -132,7 +158,7 @@ def sso_config():
 #        base_uri = request.form['base_uri']
 #        scope = request.form['scope']
 
-        base_uri = "http://localhost:5000"
+        base_uri = "http://localhost:8000"
         scope = [
             "openid",          # mandatory for OpenIDConnect auth
             "email",           # smallest and most consistent scope and claim
@@ -145,22 +171,67 @@ def sso_config():
         flash("SSO Server Updated Successfully", "success")
         return render_template(
             'sso.html',
-            oauth_server_uri=oauth_server_uri,
-            client_id=client_id,
-            client_secret=client_secret,
-            base_uri=base_uri,
-            scope=scope,
+            oauth_server_uri = oauth_server_uri,
+            client_id = client_id,
+            client_secret = client_secret,
+            base_uri = base_uri,
+            scope = scope,
         )
     else:
-        ssoUsers = SSOUserGet()
-        if ssoUsers is None:
+        ssoServer = SSOSererGet()
+        if ssoServer is None:
             return render_template('sso.html')
         else:
             return render_template(
                 'sso.html',
-                oauth_server_uri=ssoUsers.oauth_server_uri,
-                client_id=ssoUsers.client_id,
-                client_secret=ssoUsers.client_secret,
-                base_uri=ssoUsers.base_uri,
-                scope=ssoUsers.scope,
+                oauth_server_uri = ssoServer.oauth_server_uri,
+                client_id = ssoServer.client_id,
+                client_secret = ssoServer.client_secret,
+                base_uri = ssoServer.base_uri,
+                scope  = ssoServer.scope,
             )
+
+@app.route("/callback", methods=["GET"])
+def callback():
+    if 'error' in request.args:
+        if request.args.get('error') == 'access_denied':
+            flash('Access denied.', "danger")
+        else:
+            flash('Error encountered.', "danger")
+    if 'code' not in request.args and 'state' not in request.args:
+        return redirect(url_for('login'))
+    else:
+        ssoServer = SSOSererGet()
+        oauth, auth_server_info = get_auth_server_info()
+        token_url = auth_server_info["token_endpoint"]
+        userinfo_url = auth_server_info["userinfo_endpoint"]
+
+        token = oauth.fetch_token(
+            token_url,
+            authorization_response=request.url,
+            client_secret=ssoServer.client_secret,
+            timeout=60,
+            verify=False,
+        )
+        user_data = oauth.get(
+            userinfo_url,
+            timeout=60,
+            verify=False,
+        ).json()
+
+        if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
+            remote_addr = request.remote_addr
+        else:
+            remote_addr = request.environ['HTTP_X_FORWARDED_FOR']
+
+        session['oauth_token'] = token
+        session['refresh_token'] = token.get("refresh_token")
+        email = user_data['email']
+        username = user_data["preferred_username"]
+        user_token = json.dumps(token)
+        user = User.query.filter_by(username=username).first()
+        if user is None:
+            UserCreateSSO(username, email, user_token, "OpenID")
+            user = User.query.filter_by(username=username, user_type = "OpenID").first()
+        login_user(user)
+        return redirect(url_for('users'))
