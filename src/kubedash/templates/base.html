@@ -185,9 +185,12 @@
                     data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
                         <a class="collapse-item" href="/users">Users & Roles</a>
-                        <a class="collapse-item" href="/export">Download Client Config</a>
+                        {% if username_role == "Admin" %}
                         <a class="collapse-item" href="/sso-config">SSO Settings</a>
                         <!-- LDAP/AD -->
+                        <a class="collapse-item" href="/k8s-config">Kubernetes Integration</a>
+                        {% endif %}
+			<a class="collapse-item" href="/export">Download Client Config</a>
                     </div>
                 </div>
             </li>

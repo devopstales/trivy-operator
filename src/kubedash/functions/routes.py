@@ -4,12 +4,13 @@ from __main__ import app
 import requests, json, yaml, re
 from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
     UserCreateSSO
-from functions.sso import SSOUserCreate, SSOSererGet, get_auth_server_info
-from functions.k8s import k8sConfigCreate
+from functions.sso import SSOServerCreate, SSOSererGet, get_auth_server_info
+from functions.k8s import k8sConfigCreate, k8sConfigGet
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
 from werkzeug.security import check_password_hash
+from itsdangerous import base64_encode, base64_decode
 
 ##############################################################
 ## health
@@ -66,7 +67,7 @@ def login_post():
     # take the user supplied password, hash it, and compare it to the hashed password in database
     if not user or not check_password_hash(user.password_hash, password):
         flash('Please check your login details and try again.', "warning")
-        return redirect(url_for('login')) # if user doesn't exist or password is wrong/export, reload the page
+        return redirect(url_for('login')) # if user doesn't exist or password is wrong, reload the page
     else:
         login_user(user, remember=remember)
         return redirect(url_for('users'))
@@ -88,6 +89,9 @@ def logout():
 @app.route('/users', methods=['GET', 'POST'])
 @login_required
 def users():
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
     if request.method == 'POST':
         username = request.form['username']
         role = request.form['role']
@@ -95,11 +99,6 @@ def users():
         flash("User Updated Successfully", "success")
 
     users = User.query
-    current_username = current_user.username
-
-    user_tmp = User.query.filter_by(username=current_username).first()
-    username_type = user_tmp.user_type
-    username_role = user_tmp.role
 
     return render_template(
         'users.html',
@@ -152,23 +151,17 @@ def users_delete():
 @app.route('/sso-config', methods=['GET', 'POST'])
 @login_required
 def sso_config():
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
     if request.method == 'POST':
         oauth_server_uri = request.form['oauth_server_uri']
         client_id = request.form['client_id']
         client_secret = request.form['client_secret']
-#        base_uri = request.form['base_uri']
-#        scope = request.form['scope']
+        base_uri = request.form['base_uri']
+        scope = request.form['scope']
 
-        base_uri = "http://localhost:8000"
-        scope = [
-            "openid",          # mandatory for OpenIDConnect auth
-            "email",           # smallest and most consistent scope and claim
-            "offline_access",  # needed to actually ask for refresh_token
-            "good-service",
-            "profile",
-        ]
-
-        SSOUserCreate(oauth_server_uri, client_id, client_secret, base_uri, scope)
+        SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scope)
         flash("SSO Server Updated Successfully", "success")
         return render_template(
             'sso.html',
@@ -177,11 +170,25 @@ def sso_config():
             client_secret = client_secret,
             base_uri = base_uri,
             scope = scope,
+            current_username=current_username,
+            username_role=username_role,
         )
     else:
         ssoServer = SSOSererGet()
         if ssoServer is None:
-            return render_template('sso.html')
+            return render_template(
+                'sso.html',
+                base_uri = request.root_url.rstrip(request.root_url[-1]),
+                current_username = current_username,
+                username_role = username_role,
+                scope = [
+                    "openid",          # mandatory for OpenIDConnect auth
+                    "email",           # smallest and most consistent scope and claim
+                    "offline_access",  # needed to actually ask for refresh_token
+                    "good-service",
+                    "profile",
+                ]
+            )
         else:
             return render_template(
                 'sso.html',
@@ -190,6 +197,8 @@ def sso_config():
                 client_secret = ssoServer.client_secret,
                 base_uri = ssoServer.base_uri,
                 scope  = ssoServer.scope,
+                current_username = current_username,
+                username_role = username_role,
             )
 
 @app.route("/callback", methods=["GET"])
@@ -226,22 +235,28 @@ def callback():
             remote_addr = request.environ['HTTP_X_FORWARDED_FOR']
 
 ## Kubectl config
-#        try:
-#            x = requests.post('http://%s:8080/' % remote_addr, json={
-#                "context": k8s_context,
-#                "server": k8s_server_url,
-#                "certificate-authority-data": k8s_server_ca,
-#                "client-id": ssoServer.client_id,
-#                "id-token": token["id_token"],
-#                "refresh-token": token.get("refresh_token"),
-#                "idp-issuer-url": ssoServer.oauth_server_uri,
-#                "client_secret": ssoServer.client_secret,
-#                }
-#            )
-#            app.logger.info("Config sent to client")
-#            app.logger.info("Answer from clinet: %s" % x.text)
-#        except:
-#            app.logger.error ("Kubectl print back error")
+        k8sConfig = k8sConfigGet()
+        if k8sConfig is None:
+            app.logger.error ("Kubectl Integration is not configured.")
+        else:
+            # add /info for k8s plugin
+            # test /info anf send answer if is dtlogin
+            try:
+                x = requests.post('http://%s:8080/' % remote_addr, json={
+                    "context": k8sConfig.k8s_context,
+                    "server": k8sConfig.k8s_server_url,
+                    "certificate-authority-data": k8sConfig.k8s_server_ca,
+                    "client-id": ssoServer.client_id,
+                    "id-token": token["id_token"],
+                    "refresh-token": token.get("refresh_token"),
+                    "idp-issuer-url": ssoServer.oauth_server_uri,
+                    "client_secret": ssoServer.client_secret,
+                    }
+                )
+                app.logger.info("Config sent to client")
+                app.logger.info("Answer from clinet: %s" % x.text)
+            except:
+                app.logger.error ("Kubectl print back error")
 
         session['oauth_token'] = token
         session['refresh_token'] = token.get("refresh_token")
@@ -275,10 +290,15 @@ def index():
 @app.route('/k8s-config', methods=['GET', 'POST'])
 @login_required
 def k8s_config():
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
     if request.method == 'POST':
+        print(request.form)
         k8s_server_url = request.form['k8s_server_url']
         k8s_context = request.form['k8s_context']
-        k8s_server_ca = request.form['k8s_server_ca']
+        k8s_server_ca = str(base64_encode(request.form['k8s_server_ca']), 'UTF-8')
+        
 
         k8sConfigCreate(k8s_server_url, k8s_context, k8s_server_ca)
         flash("Kubernetes Config Updated Successfully", "success")
@@ -288,6 +308,20 @@ def k8s_config():
             k8s_server_url = k8s_server_url,
             k8s_context = k8s_context,
             k8s_server_ca = k8s_server_ca,
+            current_username = current_username,
+            username_role = username_role,
         )
     else:
-        return render_template('k8s.html')
+        k8sConfig = k8sConfigGet()
+        if k8sConfig is None:
+            return render_template('k8s.html')
+        else:
+            k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
+            return render_template(
+                'k8s.html',
+                k8s_server_url = k8sConfig.k8s_server_url,
+                k8s_context = k8sConfig.k8s_context,
+                k8s_server_ca = k8s_server_ca,
+                current_username = current_username,
+                username_role = username_role,
+            )

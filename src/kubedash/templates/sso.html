@@ -17,35 +17,60 @@
 
 <nav class="navbar navbar-light bg-light row"></nav>
 
-<div class="card shadow mb-4">
+<div class="container-fluid bg-light py-3">
   <form action="/sso-config" method="POST">
-    <div class="form-group">
-      <label for="oauth_server_uri">Identity Provider URL</label>
-      {% if oauth_server_uri %}
-      <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="{{ oauth_server_uri }}">
-      {% else %}
-      <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="URL">
-      {% endif %}
-    </div>
-    <div class="row">
-      <div class="col">
-        <label for="client_id">Identity Provider Client Config</label>
-        {% if client_id %}
-        <input type="text" class="form-control" id="client_id" name="client_id" placeholder="{{ client_id }}">
-        {% else %}
-        <input type="text" class="form-control" id="client_id" name="client_id" placeholder="Client ID">
-        {% endif %}
+    <div class="messages"></div>
+    <div class="col-sm-4">
+      <div class="form-group">
+        <label for="oauth_server_uri">Kubdash Base URL</label>
+        <input type="text" class="form-control" id="base_uri" name= "base_uri" placeholder="{{ base_uri }}">
       </div>
-      <div class="col">
-        {% if client_secret %}
-        <input type="text" class="form-control" id="client_secret" name="client_secret" placeholder="{{ client_secret }}">
+    </div>
+    <div class="col-sm-4">
+      <div class="form-group">
+        <label for="oauth_server_uri">Identity Provider URL</label>
+        {% if oauth_server_uri %}
+        <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="{{ oauth_server_uri }}">
         {% else %}
-        <input type="text" class="form-control" id="client_secret" name="client_secret" placeholder="Client Secret">
+        <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="URL">
         {% endif %}
       </div>
     </div>
-    <div class="form-group mt-2">
-      <button type="submit" class="btn btn-primary" >Add</button>
+    <div class="col-sm-4">
+      <div class="row">
+        <div class="col">
+          <label for="client_id">Identity Provider Client Config</label>
+          {% if client_id %}
+          <input type="text" class="form-control" id="client_id" name="client_id" placeholder="{{ client_id }}">
+          {% else %}
+          <input type="text" class="form-control" id="client_id" name="client_id" placeholder="Client ID">
+          {% endif %}
+        </div>
+        <div class="col">
+          {% if client_secret %}
+          <input type="text" class="form-control" id="client_secret" name="client_secret" placeholder="{{ client_secret }}">
+          {% else %}
+          <input type="text" class="form-control" id="client_secret" name="client_secret" placeholder="Client Secret">
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="row mb-3 g-3">
+      <div class="col-md-4 form-group">
+        <label for="validationTagsClear" class="form-label">Tags (allow clear)</label>
+        <select class="form-control" id="validationTagsClear" name="tagsClear[]" multiple data-allow-clear="true" multiple>
+          <option disabled hidden value="">Choose a tag...</option>
+          <option value="1" selected="selected">Apple</option>
+          <option value="2">Banana</option>
+          <option value="3">Orange</option>
+        </select>
+        <div class="invalid-feedback">Please select a valid tag.</div>
+      </div>
+    </div>
+    <div class="col-sm-4">
+      <div class="form-group mt-2">
+        <button type="submit" class="btn btn-primary" >Add</button>
+      </div>
     </div>
   </form>
 </div>

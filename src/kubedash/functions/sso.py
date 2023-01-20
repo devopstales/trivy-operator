@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from __main__ import db, login_manager
+from __main__ import db
 from flask_login import UserMixin
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy import PickleType
@@ -21,7 +21,7 @@ class Openid(UserMixin, db.Model):
     def __repr__(self):
         return '<Server URL %r>' % self.oauth_server_uri
 
-def SSOUserCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes):
+def SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes):
     sso = Openid.query.filter_by(oauth_server_uri=oauth_server_uri).first()
     sso_data = Openid(
         oauth_server_uri = oauth_server_uri,
@@ -31,7 +31,6 @@ def SSOUserCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes):
         scope = []
     )
     sso_data.scope.append(scopes)
-    print(sso_data)
     if sso is None:
         db.session.add(sso_data)
         db.session.commit()
