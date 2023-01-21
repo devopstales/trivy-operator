@@ -161,7 +161,14 @@ def sso_config():
         base_uri = request.form['base_uri']
         scope = request.form['scope']
 
-        SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scope)
+        SSOServerCreate(
+            oauth_server_uri,
+            client_id, 
+            client_secret,
+            username_role, 
+            base_uri,
+            scope
+        )
         flash("SSO Server Updated Successfully", "success")
         return render_template(
             'sso.html',
@@ -325,3 +332,124 @@ def k8s_config():
                 current_username = current_username,
                 username_role = username_role,
             )
+
+@app.route('/export')
+@login_required
+def export():
+    username = current_user.username
+    user = User.query.filter_by(username=username, user_type = "OpenID").first()
+    user_tmp = User.query.filter_by(username=username).first()
+    username_role = user_tmp.role
+    if user is None:
+        return render_template(
+            'export.html',
+            preferred_username = current_user.username,
+            username_role = username_role
+        )
+    else:
+        ssoServer = SSOSererGet()
+        redirect_uri = ssoServer.base_uri+"/callback"
+        k8sConfig = k8sConfigGet()
+        k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
+        auth_server_info, oauth = get_auth_server_info()
+
+        token_url = auth_server_info["token_endpoint"]
+        token = oauth.refresh_token(
+            token_url = token_url,
+            refresh_token = session['refresh_token'],
+            client_id = ssoServer.client_id,
+            client_secret = ssoServer.client_secret,
+            verify=False,
+            timeout=60,
+        )
+
+        userinfo_url = auth_server_info["userinfo_endpoint"]
+        user_data = oauth.get(
+            userinfo_url,
+            timeout=60,
+            verify=False,
+        ).json()
+
+        return render_template(
+            'export.html',
+            preferred_username=user_data["preferred_username"],
+            username_role = username_role,
+            redirect_uri = redirect_uri,
+            client_id = ssoServer.client_id,
+            client_secret = ssoServer.client_secret,
+            id_token = token["id_token"],
+            refresh_token = token.get("refresh_token"),
+            oauth_server_uri = ssoServer.oauth_server_uri,
+            context = k8sConfig.k8s_context,
+            k8s_server_url = k8sConfig.k8s_server_url,
+            k8s_server_ca = k8s_server_ca
+        )
+
+@app.route("/get-file")
+def get_file():
+    ssoServer = SSOSererGet()
+    k8sConfig = k8sConfigGet()
+    auth_server_info, oauth = get_auth_server_info()
+    token_url = auth_server_info["token_endpoint"]
+    verify = False
+
+    token = oauth.refresh_token(
+        token_url = token_url,
+        refresh_token = session['refresh_token'],
+        client_id = ssoServer.client_id,
+        client_secret = ssoServer.client_secret,
+        verify = verify,
+        timeout = 60,
+    )
+
+    kube_user = {
+            "auth-provider": {
+                "name": "oidc",
+                "config": {
+                    "client-id": ssoServer.client_id,
+                    "idp-issuer-url": ssoServer.oauth_server_uri,
+                    "id-token": token["id_token"],
+                    "refresh-token": token.get("refresh_token"),
+                }
+            }
+        }
+    if ssoServer.client_secret:
+        kube_user["auth-provider"]["config"]["client-secret"] = ssoServer.client_secret
+    if verify:
+        kube_user["auth-provider"]["config"]["idp-certificate-authority"] = verify
+    
+    kube_cluster = {
+        "certificate-authority-data": k8sConfig.k8s_server_ca,
+        "server": k8sConfig.k8s_server_url
+    }
+    kube_context = {
+        "cluster": k8sConfig.context,
+        "user": k8sConfig.context,
+    }
+    config_snippet = {
+        "apiVersion": "v1",
+        "kind": "Config",
+        "clusters": [{
+            "name": k8sConfig.context,
+            "cluster": kube_cluster
+        }],
+        "contexts": [{
+            "name": k8sConfig.context,
+            "context": kube_context
+        }],
+        "current-context": k8sConfig.context,
+        "preferences": {},
+        "users": [{
+            "name": k8sConfig.context,
+            "user": kube_user
+        }]
+    }
+
+    return Response(
+            yaml.safe_dump(config_snippet),
+            mimetype="text/yaml",
+            headers={
+                "Content-Disposition":
+                "attachment;filename=kubecfg.yaml"
+            }
+    )
