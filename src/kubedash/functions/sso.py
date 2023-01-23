@@ -30,7 +30,7 @@ def SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes
         base_uri = base_uri,
         scope = []
     )
-    sso_data.scope.append(scopes)
+    sso_data.scope = scopes
     if sso is None:
         db.session.add(sso_data)
         db.session.commit()
@@ -44,19 +44,17 @@ def get_auth_server_info():
     oauth = OAuth2Session(
         ssoServer.client_id,
         redirect_uri = redirect_uri,
-#        scope = list(ssoServer.scope)
-        scope = [
-            "openid",          # mandatory for OpenIDConnect auth
-            "email",           # smallest and most consistent scope and claim
-            "offline_access",  # needed to actually ask for refresh_token
-            "good-service",
-            "profile",
-        ]
+        scope = ssoServer.scope
     )
-    auth_server_info = oauth.get(
-        f"{ssoServer.oauth_server_uri}/.well-known/openid-configuration",
-        withhold_token=True,
-        verify=False
-    ).json()
+    try:
+        auth_server_info = oauth.get(
+            f"{ssoServer.oauth_server_uri}/.well-known/openid-configuration",
+            withhold_token=True,
+            verify=False,
+            timeout=1
+        ).json()
+    except:
+        auth_server_info = None
+
 
     return oauth, auth_server_info

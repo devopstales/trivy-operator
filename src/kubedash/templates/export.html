@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block header %}
+<!-- highlight js -->
+<link rel="stylesheet" href="{{ url_for('static',filename='an-old-hope.min.css') }}">
+<script src="{{ url_for('static',filename='highlight.min.js') }}"></script>
+<script>hljs.highlightAll();</script>
+{% endblock %}
+
+{% block content %}
+{% if context is defined %}
+<h2 class="text-center my-4" >Welcome {{ preferred_username }}</h2>
+<h3 class="text-center my-4" >In order to get command-line acces to the {{ context }} Kubernetes cluster, you will need to configure OpenID Connect (OIDC) authentication for your client.</h3>
+
+<ul class="nav nav-tabs mb-4 mx-5">
+  <li class="nav-item">
+    <a class="nav-link active" href="#KubernetesApiServer">Kubernetes ApiServer</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#KubectlPlugin">Kubectl Plugin</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#DownloadKubeconfig">Download Kubeconfig</a>
+  </li>
+  <li class="nav-item"></li>
+    <a class="nav-link" href="#RunningKubectl">Running kubectl</a>
+</li>
+  <li class="nav-item"></li>
+    <a class="nav-link" href="#lAdvanced">Advanced</a>
+  </li>
+</ul>
+
+<div data-spy="scroll" data-target="#list" data-offset="0" class="scrollspy"></div>
+
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="KubernetesApiServer">Kubernetes ApiServer</h5>
+  </div>
+  
+  <div class="card-body">
+    <h5 class="card-title">Kubernetes ApiServer integration with OpeniD provider</h5><pre><code>nano /etc/kubernetes/manifests/kube-apiserver.yaml
+...
+command:
+- /hyperkube
+- apiserver
+...
+- --oidc-issuer-url={{ oauth_server_uri }}
+- --oidc-client-id={{ client_id }}
+- --oidc-username-claim=email
+- --oidc-groups-claim=groups
+# for self sign cert or custom ca
+#- --oidc-ca-file=/etc/kubernetes/pki/rootca.pem
+...
+
+systemctl restart kubelet</code></pre>
+  </div>
+</div>
+
+  <div class="card mb-4 mx-5">
+    <div class="card-header py-3">
+      <h5 class="m-0 font-weight-bold text-primary" id="KubectlPlugin">Kubectl Plugin</h5>
+    </div>
+    <div class="card-body">
+      <h5 class="card-title">Install as Kubectl plugin.</h5><pre><code># Homebrew (macOS and Linux)
+brew tap devopstales/devopstales
+brew install kubectl-login
+
+# Main Krew with differente name (macOS, Linux, Windows and ARM)
+kubectl krew install dtlogin
+
+# My krew repo (macOS, Linux, Windows and ARM)
+kubectl krew index add devopstales https://github.com/devopstales/krew
+kubectl krew install devopstales/login
+
+# My krew repo (macOS, Linux, Windows and ARM)
+kubectl krew index add devopstales https://github.com/devopstales/krew
+kubectl krew install devopstales/login
+
+# Chocolatey (Windows)
+choco install kubectl-login
+
+# Binary release (Windows, macOS and Linux)
+https://github.com/devopstales/kube-openid-connect/releases</code></pre>
+      <h5 class="card-title">Use the plugin.</h5>
+      <pre><code class="bash">$ kubectl login {{ base_uri }}/dtlogin
+# OR I sou installed from main Krew
+kubectl dtlogin {{ base_uri }}/dtlogin
+Configfile created with config for productioncluster to ~/.kube/config
+Happy Kubernetes interaction!</code></pre>
+    </div>
+  </div>
+
+  <div class="card mb-4 mx-5">
+    <div class="card-header py-3">
+      <h5 class="m-0 font-weight-bold text-primary" id="DownloadKubeconfig">Download Kubeconfig File</h5>
+    </div>
+    <div class="card-body">
+      <p class="card-text">If you didn't want to use the kubectl plugin, save this file as <code>~/.kube/config</code> to enable OIDC based <code>kubectl</code> authentication.</p>
+      <a href="/get-file" class="btn btn-primary">Download Config File</a>
+    </div>
+  </div>
+
+  <div class="card mb-4 mx-5">
+    <div class="card-header py-3">
+      <h5 class="m-0 font-weight-bold text-primary" id="RunningKubectl">Running kubectl</h5>
+    </div>
+    <div class="card-body">
+      <p class="card-text">Once you get the <code>~/.kube/config</code> file you should be able to run <code>kubectl</code>: </p>
+      <pre><code class="bash"># These are examples. Your context and cluster names will likely differ.
+
+$ kubectl config get-contexts
+CURRENT   NAME       CLUSTER            AUTHINFO   NAMESPACE
+      k8s        k8s                k8s        
+      microk8s   microk8s-cluster   admin      
+
+$ kubectl --context k8s get namespaces
+NAME          STATUS    AGE
+default       Active    83d
+experimental  Active    15d
+
+$ kubectl --context k8s -n experimental get pods
+NAME                                       READY     STATUS             RESTARTS   AGE
+testapp-4074452424-06m0b                   1/1       Running            1          6d</code></pre>
+    </div>
+  </div>
+
+  <div class="card mx-5 mb-5">
+    <div class="card-header py-3">
+      <h5 class="m-0 font-weight-bold text-primary" id="lAdvanced">Authenticate Manually</h5>
+    </div>
+    <div class="card-body">
+      <p class="card-text">If you want to maintain your existing <code>~/.kube/config</code> file you can run the following to add your user: </p>
+      <pre><code class="bash"># Create k8s server ca pem
+echo "{{ k8s_server_ca }}
+" \ > ca-k8s.pem
+
+# Add your server to kubectl config
+kubectl config set-cluster {{ context }} \
+--server={{ k8s_server_url }} \
+--user={{ preferred_username }} \
+--certificate-authority=ca-k8s.pem
+
+# Add your user to kubectl config
+kubectl config set-credentials "{{ preferred_username }}" \
+--auth-provider=oidc \
+--auth-provider-arg=client-id="{{ client_id }}" \
+--auth-provider-arg=client-secret="{{ client_secret }}" \
+--auth-provider-arg=id-token="{{ id_token }}" \
+--auth-provider-arg=refresh-token="{{ refresh_token }}" \
+--auth-provider-arg=idp-issuer-url="{{ oauth_server_uri }}"
+
+# Associate your user with an existing cluster
+kubectl config set-context {{ context }} --cluster {{ context }} --user="{{ preferred_username }}"
+kubectl config use-context {{ context }}</code></pre>
+    </div>
+  </div>
+{% else %}
+<h2 class="text-center my-4" >Welcome {{ preferred_username }}</h2>
+<h3 class="text-center my-4" >In order to get command-line acces to the Kubernetes cluster, you need to login with OpenID Connect (OIDC) authentication to this app.</h3>
+{% endif %}
+{% endblock %}

@@ -39,14 +39,19 @@ def login():
         ssoServer = SSOSererGet()
         if ssoServer is not None:
             oauth, auth_server_info = get_auth_server_info()
-            auth_url = auth_server_info["authorization_endpoint"]
-            authorization_url, state = oauth.authorization_url(
-                auth_url,
-                access_type="offline",  # not sure if it is actually always needed,
-                                        # may be a cargo-cult from Google-based example
-            )
-            session['oauth_state'] = state
-            is_sso_enabled = True
+            if auth_server_info is not None:
+                auth_url = auth_server_info["authorization_endpoint"]
+                authorization_url, state = oauth.authorization_url(
+                    auth_url,
+                    access_type="offline",  # not sure if it is actually always needed,
+                                            # may be a cargo-cult from Google-based example
+                )
+                session['oauth_state'] = state
+                is_sso_enabled = True
+            else:
+                is_sso_enabled = False
+                flash('Cannot connect to identity provider!', "warning")
+
 
         return render_template(
             'login.html',
@@ -159,13 +164,16 @@ def sso_config():
         client_id = request.form['client_id']
         client_secret = request.form['client_secret']
         base_uri = request.form['base_uri']
-        scope = request.form['scope']
+        if not base_uri:
+            base_uri = request.root_url.rstrip(request.root_url[-1])
+        scope = request.form.getlist('scope')
+        while("" in scope):
+            scope.remove("")
 
         SSOServerCreate(
             oauth_server_uri,
             client_id, 
             client_secret,
-            username_role, 
             base_uri,
             scope
         )
@@ -177,8 +185,8 @@ def sso_config():
             client_secret = client_secret,
             base_uri = base_uri,
             scope = scope,
-            current_username=current_username,
-            username_role=username_role,
+            current_username = current_username,
+            username_role = username_role,
         )
     else:
         ssoServer = SSOSererGet()
@@ -321,7 +329,11 @@ def k8s_config():
     else:
         k8sConfig = k8sConfigGet()
         if k8sConfig is None:
-            return render_template('k8s.html')
+            return render_template(
+                'k8s.html',
+                current_username = current_username,
+                username_role = username_role,
+            )
         else:
             k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
             return render_template(
