@@ -55,6 +55,7 @@ def get_auth_server_info():
         ).json()
     except:
         auth_server_info = None
+    print(auth_server_info)
 
 
-    return oauth, auth_server_info
+    return auth_server_info, oauth

@@ -17,47 +17,53 @@
 
 <nav class="navbar navbar-light bg-light row"></nav>
 
-<div class="container-fluid bg-light py-3">
-    <form action="/k8s-config" method="POST">
-        <div class="messages"></div>
-        <div class="col-sm-4">
-            <div class="form-group">
-                <label for="k8s_server_url">Kubernetes API URL</label>
-                {% if k8s_server_url %}
-                <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="{{ k8s_server_url }}">
-                {% else %}
-                <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="URL">
-                {% endif %}
+<div class="card mb-4 mx-5">
+    <div class="card-header py-3">
+      <h5 class="m-0 font-weight-bold text-primary" id="KubernetesApiServer">Kubernetes ApiServer Config</h5>
+    </div>
+    
+    <div class="card-body">
+        <form action="/k8s-config" method="POST">
+            <div class="messages"></div>
+            <div class="col-sm-4">
+                <div class="form-group">
+                    <label for="k8s_server_url">Kubernetes API URL</label>
+                    {% if k8s_server_url %}
+                    <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="{{ k8s_server_url }}">
+                    {% else %}
+                    <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="URL">
+                    {% endif %}
+                </div>
             </div>
-        </div>
-        <div class="col-sm-4">
-            <div class="form-group">
-                <label for="k8s_context">Kubernetes Config Context</label>
-                {% if k8s_context %}
-                <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="{{ k8s_context }}">
-                {% else %}
-                <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="URL">
-                {% endif %}
+            <div class="col-sm-4">
+                <div class="form-group">
+                    <label for="k8s_context">Kubernetes Config Context</label>
+                    {% if k8s_context %}
+                    <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="{{ k8s_context }}">
+                    {% else %}
+                    <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="URL">
+                    {% endif %}
+                </div>
             </div>
-        </div>
-        <div class="col-sm-4">
-            <div class="form-group">
-                <label for="k8s_server_ca">Kubernetes CA Certificate</label>
-                {% if k8s_server_ca %}
-                <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3">{{ k8s_server_ca }}</textarea>
-                {% else %}
-                <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3"></textarea>
-                {% endif %}
+            <div class="col-sm-4">
+                <div class="form-group">
+                    <label for="k8s_server_ca">Kubernetes CA Certificate</label>
+                    {% if k8s_server_ca %}
+                    <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3">{{ k8s_server_ca }}</textarea>
+                    {% else %}
+                    <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3"></textarea>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-        <div class="col-sm-4">
-            <div class="form-group mt-2">
-                <button type="submit" class="btn btn-primary" >Add</button>
+            <div class="col-sm-4">
+                <div class="form-group mt-2">
+                    <button type="submit" class="btn btn-primary" >Add</button>
+                </div>
             </div>
-        </div>
+            </form>
         </form>
-    </form>
-</div>
+    </div>
+  </div>
 {% endblock %}
 
 {% block scripts %}

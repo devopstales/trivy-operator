@@ -18,58 +18,65 @@
 
 <nav class="navbar navbar-light bg-light row"></nav>
 
-<div class="container-fluid bg-light py-3">
-  <form action="/sso-config" method="POST">
-    <div class="messages"></div>
-    <div class="col-sm-4">
-      <div class="form-group">
-        <label for="oauth_server_uri">Kubdash Base URL</label>
-        <input type="text" class="form-control" id="base_uri" name= "base_uri" value="{{ base_uri }}">
-      </div>
-    </div>
-    <div class="col-sm-4">
-      <div class="form-group">
-        <label for="oauth_server_uri">Identity Provider URL</label>
-        {% if oauth_server_uri %}
-        <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" value="{{ oauth_server_uri }}">
-        {% else %}
-        <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="URL">
-        {% endif %}
-      </div>
-    </div>
-    <div class="col-sm-4">
-      <div class="row">
-        <div class="col">
-          <label for="client_id">Identity Provider Client Config</label>
-          {% if client_id %}
-          <input type="text" class="form-control" id="client_id" name="client_id" value="{{ client_id }}">
-          {% else %}
-          <input type="text" class="form-control" id="client_id" name="client_id" placeholder="Client ID">
-          {% endif %}
+<div class="card mb-4 mx-5">
+  <div class="card-header py-3">
+    <h5 class="m-0 font-weight-bold text-primary" id="KubernetesApiServer">Kubernetes ApiServer</h5>
+  </div>
+  
+  <div class="card-body">
+    <form action="/sso-config" method="POST">
+      <div class="messages"></div>
+      <div class="col-sm-4">
+        <div class="form-group">
+          <label for="oauth_server_uri">Identity Provider Config</label>
+          <input type="text" class="form-control" id="base_uri" name= "base_uri" value="{{ base_uri }}">
         </div>
-        <div class="col">
-          {% if client_secret %}
-          <input type="text" class="form-control" id="client_secret" name="client_secret" value="{{ client_secret }}">
+      </div>
+      <div class="col-sm-4">
+        <div class="form-group">
+          <label for="oauth_server_uri">Identity Provider URL</label>
+          {% if oauth_server_uri %}
+          <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" value="{{ oauth_server_uri }}">
           {% else %}
-          <input type="text" class="form-control" id="client_secret" name="client_secret" placeholder="Client Secret">
+          <input type="text" class="form-control" id="oauth_server_uri" name= "oauth_server_uri" placeholder="URL">
           {% endif %}
         </div>
       </div>
-    </div>
-    <div class="col-sm-4">
-      <p>Press enter or add a comma after each tag</p>
-      <select class="form-control" multiple data-role="tagsinput" id="scope" name="scope">
-        {% for s in scope %}
-        <option value="{{ s }}">{{ s }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-sm-4">
-      <div class="form-group mt-2">
-        <button type="submit" class="btn btn-primary" >Add</button>
+      <div class="col-sm-8">
+        <div class="row">
+          <div class="col">
+            <label for="client_id">Identity Provider Client ID</label>
+            {% if client_id %}
+            <input type="text" class="form-control" id="client_id" name="client_id" value="{{ client_id }}">
+            {% else %}
+            <input type="text" class="form-control" id="client_id" name="client_id" placeholder="Client ID">
+            {% endif %}
+          </div>
+          <div class="col">
+            <label for="client_id">Identity Provider Client Secret</label>
+            {% if client_secret %}
+            <input type="text" class="form-control" id="client_secret" name="client_secret" value="{{ client_secret }}">
+            {% else %}
+            <input type="text" class="form-control" id="client_secret" name="client_secret" placeholder="Client Secret">
+            {% endif %}
+          </div>
+        </div>
       </div>
-    </div>
-  </form>
+      <div class="col-sm-8 mt-2">
+        <p>Press enter or add a comma after each tag</p>
+        <select class="form-control" multiple data-role="tagsinput" id="scope" name="scope">
+          {% for s in scope %}
+          <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 mt-2">
+        <div class="form-group">
+          <button type="submit" class="btn btn-primary" >Add</button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 {% endblock %}
 

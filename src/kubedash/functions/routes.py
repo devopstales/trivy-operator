@@ -5,7 +5,8 @@ import requests, json, yaml, re
 from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
     UserCreateSSO
 from functions.sso import SSOServerCreate, SSOSererGet, get_auth_server_info
-from functions.k8s import k8sConfigCreate, k8sConfigGet
+from functions.k8s import k8sConfigCreate, k8sConfigGet, k8sGetNamespaceList, \
+    k8sGetUserClusterRoleTemplateList, k8sGetUserRoleTemplateList
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -38,7 +39,7 @@ def login():
 
         ssoServer = SSOSererGet()
         if ssoServer is not None:
-            oauth, auth_server_info = get_auth_server_info()
+            auth_server_info, oauth = get_auth_server_info()
             if auth_server_info is not None:
                 auth_url = auth_server_info["authorization_endpoint"]
                 authorization_url, state = oauth.authorization_url(
@@ -97,6 +98,7 @@ def users():
     current_username = current_user.username
     user_tmp = User.query.filter_by(username=current_username).first()
     username_role = user_tmp.role
+    username_type = user_tmp.user_type
     if request.method == 'POST':
         username = request.form['username']
         role = request.form['role']
@@ -104,6 +106,16 @@ def users():
         flash("User Updated Successfully", "success")
 
     users = User.query
+    if username_type == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+    namespace_list = k8sGetNamespaceList(username_role, user_token)
+    user_clusterRole_template_list = k8sGetUserClusterRoleTemplateList(username_role, user_token)
+    user_role_template_list = k8sGetUserRoleTemplateList(username_role, user_token)
+    if not user_clusterRole_template_list and not user_role_template_list:
+        from functions.k8s import k8sAddClusterRoles
+        k8sAddClusterRoles()
 
     return render_template(
         'users.html',
@@ -111,9 +123,9 @@ def users():
         users=users,
         current_username=current_username,
         username_role=username_role,
-#        namespace_list=namespace_list,
-#        user_clusterRole_template_list=user_clusterRole_template_list,
-#        user_role_template_list=user_role_template_list,
+        namespace_list=namespace_list,
+        user_clusterRole_template_list=user_clusterRole_template_list,
+        user_role_template_list=user_role_template_list,
     )
 
 @app.route('/users/add', methods=['GET', 'POST'])
