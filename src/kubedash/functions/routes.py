@@ -5,8 +5,9 @@ import requests, json, yaml, re
 from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
     UserCreateSSO
 from functions.sso import SSOServerCreate, SSOSererGet, get_auth_server_info
-from functions.k8s import k8sConfigCreate, k8sConfigGet, k8sGetNamespaceList, \
-    k8sGetUserClusterRoleTemplateList, k8sGetUserRoleTemplateList
+from functions.k8s import k8sConfigCreate, k8sConfigGet, \
+    k8sGetNamespaceList, k8sGetNamespaces, k8sCreateNamespace, k8sDeleteNamespace, \
+    k8sGetUserClusterRoleTemplateList, k8sGetUserRoleTemplateList, k8sGetNodesList
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -119,13 +120,12 @@ def users():
 
     return render_template(
         'users.html',
-#        base_uri=base_uri,
-        users=users,
-        current_username=current_username,
-        username_role=username_role,
-        namespace_list=namespace_list,
-        user_clusterRole_template_list=user_clusterRole_template_list,
-        user_role_template_list=user_role_template_list,
+        users = users,
+        current_username = current_username,
+        username_role = username_role,
+        namespace_list = namespace_list,
+        user_clusterRole_template_list = user_clusterRole_template_list,
+        user_role_template_list = user_role_template_list,
     )
 
 @app.route('/users/add', methods=['GET', 'POST'])
@@ -477,3 +477,97 @@ def get_file():
                 "attachment;filename=kubecfg.yaml"
             }
     )
+##############################################################
+## Kubernetes Cluster
+##############################################################
+## Nodes
+##############################################################
+
+@app.route("/nodes")
+@login_required
+def nodes():
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
+    username_type = user_tmp.user_type
+
+    users = User.query
+    if username_type == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    node_data = k8sGetNodesList(username_role, user_token)
+
+    return render_template(
+        'nodes.html',
+        nodes = node_data,
+        current_username = current_username,
+        username_role = username_role,
+    )
+
+##############################################################
+## Namespaces
+##############################################################
+
+@app.route("/namespaces")
+@login_required
+def namespaces():
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
+    username_type = user_tmp.user_type
+
+    if username_type == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    namespace_list = k8sGetNamespaces(username_role, user_token)
+
+    return render_template(
+        'namespaces.html',
+        namespace_list = namespace_list,
+        current_username = current_username,
+        username_role = username_role,
+    )
+
+@app.route("/namespaces/create", methods=['GET', 'POST'])
+@login_required
+def namespaces_create():
+    if request.method == 'POST':
+        namespace = request.form['namespace']
+        current_username = current_user.username
+        user_tmp = User.query.filter_by(username=current_username).first()
+        username_role = user_tmp.role
+        username_type = user_tmp.user_type
+
+        if username_type == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        k8sCreateNamespace(username_role, user_token, namespace)
+        return redirect(url_for('namespaces'))
+    else:
+        return redirect(url_for('namespaces'))
+
+@app.route("/namespaces/delete", methods=['GET', 'POST'])
+@login_required
+def namespaces_delete():
+    if request.method == 'POST':
+        namespace = request.form['namespace']
+        current_username = current_user.username
+        user_tmp = User.query.filter_by(username=current_username).first()
+        username_role = user_tmp.role
+        username_type = user_tmp.user_type
+
+        if username_type == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        k8sDeleteNamespace(username_role, user_token, namespace)
+        return redirect(url_for('namespaces'))
+    else:
+        return redirect(url_for('namespaces'))

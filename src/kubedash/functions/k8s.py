@@ -98,6 +98,60 @@ def k8sGetNamespaceList(username_role, user_token):
     except:
         return namespace_list
 
+def k8sGetNamespaces(username_role, user_token):
+    k8sGetConfig(username_role, user_token)
+    NAMESPACE_LIST = []
+    try:
+        namespaces, error = k8sListNamespaces(username_role, user_token)
+        if error is None:
+            for ns in namespaces.items:
+                NAMESPACE_DADTA = {
+                    "name": "",
+                    "staus": "",
+                }
+                NAMESPACE_DADTA['name'] = ns.metadata.name
+                NAMESPACE_DADTA['staus'] = ns.status.__dict__['_phase']
+                NAMESPACE_LIST.append(NAMESPACE_DADTA)
+            return NAMESPACE_LIST
+        else:
+            ErrorHandler(error, "list namespaces")
+            return NAMESPACE_LIST
+    except:
+        return NAMESPACE_LIST
+
+def k8sCreateNamespace(username_role, user_token, ns_name):
+    k8sGetConfig(username_role, user_token)
+    pretty = 'true'
+    field_manager = 'KubeDash'
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.CoreV1Api(api_client)
+        body = k8s_client.V1Namespace(
+            api_version = "",
+            kind = "",
+            metadata = k8s_client.V1ObjectMeta(
+                name = ns_name,
+                labels = {
+                    "created_by": field_manager
+                }
+            )
+        )
+    try:
+        api_response = api_instance.create_namespace(body, pretty=pretty, field_manager=field_manager)
+        flash("Namespace Created Successfully", "success")
+    except ApiException as error:
+        ErrorHandler(error, "create namespace")
+
+def k8sDeleteNamespace(username_role, user_token, ns_name):
+    k8sGetConfig(username_role, user_token)
+    pretty = 'true'
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.CoreV1Api(api_client)
+    try:
+        api_response = api_instance.delete_namespace(ns_name, pretty=pretty)
+        flash("Namespace Deleted Successfully", "success")
+    except ApiException as error:
+        ErrorHandler(error, "create namespace")
+
 ##############################################################
 ## Kubernetes User Role template
 ##############################################################
@@ -333,3 +387,56 @@ def k8sAddClusterRoles():
                 logger.info("ClusterRole %s alredy exists" % name) # WARNING
             else:
                 k8sCreateClusterRole(name, roleVars[role])
+
+##############################################################
+## Kubernetes Nodes
+##############################################################
+
+def k8sListNodes(username_role, user_token):
+    k8sGetConfig(username_role, user_token)
+    node_list = list()
+    try:
+        node_list = k8s_client.CoreV1Api().list_node()
+        return node_list, None
+    except ApiException as e:
+        return node_list, e
+
+def k8sGetNodesList(username_role, user_token):
+    k8sGetConfig(username_role, user_token)
+    nodes, error = k8sListNodes(username_role, user_token)
+    NODE_LIST = []
+    NODE_INFO = {
+        "status": "",
+        "name": "",
+        "role": "",
+        "version": "",
+        "os": "",
+        "runtime": "",
+        "taint": "",
+    }
+    if error is None:
+        for no in nodes.items:
+            NODE_INFO['name'] = no.metadata.name
+            TAINTS = no.spec.taints
+            NODE_INFO['role'] = None
+            for label, value in no.metadata.labels.items():
+                if label == "kubernetes.io/os":
+                    NODE_INFO['os'] = value
+                elif label == "node-role.kubernetes.io/master":
+                    NODE_INFO['role'] = "Master"
+            for key, value in no.status.node_info.__dict__.items():
+                if key == "_container_runtime_version":
+                    NODE_INFO['runtime'] = value
+                elif key == "_kubelet_version":
+                    NODE_INFO['version'] = value
+            
+            for key, value in no.status.conditions[-1].__dict__.items():
+                if key == "_type":
+                    NODE_INFO['status'] = value
+            if NODE_INFO['role'] == None:
+                NODE_INFO['role'] = "Worker"
+            NODE_LIST.append(NODE_INFO)
+        return NODE_LIST
+    else:
+        ErrorHandler(error, "get node list")
+        return NODE_LIST
