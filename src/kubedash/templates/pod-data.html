@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block header %}
+    <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+{% endblock %}
+
+{% block content %}
+{% if get_flashed_messages() %}
+{% for category, message in get_flashed_messages(with_categories=true) %}
+<div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+  {{ message }}
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% endfor %}
+{% endif %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h5 class="m-0 font-weight-bold text-primary">
+         <form action="/pods" method="POST">
+            <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+            <a href="#" onclick="event.preventDefault(); this.parentNode.submit()">Pod:</a> {{ po_now }}
+         </form>
+        </h5>
+    </div>
+    <div class="card-body">
+        <nav>
+            <div class="nav nav-tabs" id="nav-tab" role="tablist">
+            <button class="nav-link active" id="nav-pod-tab" data-toggle="tab" data-target="#nav-pod" type="button" role="tab" aria-controls="nav-pod" aria-selected="true">Pod</button>
+            <button class="nav-link" id="nav-containers-tab" data-toggle="tab" data-target="#nav-containers" type="button" role="tab" aria-controls="nav-containers" aria-selected="false">Containers</button>
+            <button class="nav-link" id="nav-conditions-tab" data-toggle="tab" data-target="#nav-conditions" type="button" role="tab" aria-controls="nav-conditions" aria-selected="false">Conditions</button>
+            <button class="nav-link" id="nav-security-tab" data-toggle="tab" data-target="#nav-security" type="button" role="tab" aria-controls="nav-security" aria-selected="false">Security Contexts</button>
+            <button class="nav-link" id="nav-resources-tab" data-toggle="tab" data-target="#nav-resources" type="button" role="tab" aria-controls="nav-resources" aria-selected="false">Related Resources</button>
+            </div>
+        </nav>
+      <div class="tab-content" id="nav-tabContent">
+        <div class="tab-pane fade show active" id="nav-pod" role="tabpanel" aria-labelledby="nav-home-tab">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                            <tr>
+                                <th>Namespace:</th>
+                                <td>{{ pod_data.namespace }}</td>
+                            </tr>
+                            <tr>
+                                <th>Name:</th>
+                                <td>{{ pod_data.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Node:</th>
+                                <td>{{ pod_data.node }}</td>
+                            </tr>
+                            <tr>
+                                <th>Owner:</th>
+                                <td>
+                                    <form action="/{{ pod_data.owner.split("/")[0] }}" method="post">
+                                      <input type="hidden" name="ns_select" value="{{ pod_data.namespace }}" />
+                                      <input type="hidden" name="tr_select" value="{{ pod_data.owner.split("/")[1] }}" />
+                                      <a href="javascript:;" onclick="parentNode.submit();">{{ pod_data.owner }}</a>
+                                    </form>
+                                  </td>
+                            </tr>
+                            <tr>
+                                <th>Priority:</th>
+                                <td>{{ pod_data.priority }}</td>
+                            </tr>
+                            <tr>
+                                <th>Priority Class:</th>
+                                <td>{{ pod_data.priority_class_name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Runetime Class:</th>
+                                <td>{{ pod_data.runtime_class_name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Lables:</th>
+                                <td>
+                                    {% for i in pod_data.labels %}
+                                        {% for key, value in i.items() %}
+                                            {{ key }}: {{ value }}<br>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="nav-containers" role="tabpanel" aria-labelledby="nav-profile-tab">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    {% if pod_data.init_containers %}
+                    <h3>Init Containers</h3>
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                  <th>State</th>
+                                  <th>Name</th>
+                                  <th>Image</th>
+                                  <th>Restarts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ic in pod_data.init_containers %}
+                                <tr>
+                                    <td>{{ ic.ready }}</td>
+                                    <td>{{ ic.name }}</td>
+                                    <td>{{ ic.image }}</td>
+                                    <td>{{ ic.restarts }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                    <h3>Containers</h3>
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                  <th>State</th>
+                                  <th>Name</th>
+                                  <th>Image</th>
+                                  <th>Restarts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in pod_data.containers %}
+                                <tr>
+                                    <td>{{ c.ready }}</td>
+                                    <td>{{ c.name }}</td>
+                                    <td>{{ c.image }}</td>
+                                    <td>{{ c.restarts }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- metrics ? -->
+        <div class="tab-pane fade" id="nav-conditions" role="tabpanel" aria-labelledby="nav-contact-tab">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                  <th>Condition</th>
+                                  <th>State</th>
+                                </tr>
+                            </thead>
+                           {% for dict_item in pod_data.conditions %}
+                           <tbody>
+                                {% for key, value in dict_item.items() %}
+                                <tr>
+                                    <td>{{ key }}</td>
+                                    <td>{{ value }}</td>
+                                </tr>
+                                {% endfor%}
+                            </tbody>
+                            {% endfor %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="nav-security" role="tabpanel" aria-labelledby="nav-profile-tab">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                            <!-- {{ pod_data.security_context }} -->
+                            <thead>
+                                <tr>
+                                  <th>Context</th>
+                                  <th>State</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for item in pod_data.security_context.items() %}
+                                <tr>
+                                    <td>{{ item[0] }}</td>
+                                    <td>{{ item[1] }}</td>
+                                </tr>
+                            {% endfor%}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="nav-resources" role="tabpanel" aria-labelledby="nav-contact-tab">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <h3>Refered By</h3>
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                            <thead>
+                                <th>Type</th>
+                                <th>Name</th>
+                                <th>Namespace</th>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>{{ pod_data.owner.split("/")[0] }}</td>
+                                    <td>{{ pod_data.owner.split("/")[-1] }}</td>
+                                    <td>{{ pod_data.namespace }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <h3>Refers To</h3>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                <!-- service account, secret, configmap, volume-->
+                                <thead>
+                                    <th>Type</th>
+                                    <th>Name</th>
+                                    <th>Namespace</th>
+                                </thead>
+                                <tbody>
+                                {% if pod_data.image_pull_secrets %}
+                                    {% for dict_item in pod_data.image_pull_secrets %}
+                                    {% for key, value in dict_item.items() %}
+                                    <tr>
+                                        <td>ImagePullSecret</td>
+                                        <td>{{ value }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% endfor %}
+                                {% endif %}
+                                {% if pod_data.service_account %}
+                                    <tr>
+                                        <td>ServiceAccount</td>
+                                        <td>{{ pod_data.service_account }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                {% endif %}
+                                {% if pod_data.secrets %}
+                                    {% for secret in pod_data.secrets %}
+                                    <tr>
+                                        <td>Secret</td>
+                                        <td>{{ secret }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if pod_data.cm %}
+                                    {% for cm in pod_data.cm %}
+                                    <tr>
+                                        <td>Configmap</td>
+                                        <td>{{ cm }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if pod_data.pvc %}
+                                    {% for pvc in pod_data.pvc %}
+                                    <tr>
+                                        <td>PeristentVolumeClame</td>
+                                        <td>{{ pvc }}</td>
+                                        <td>{{ pod_data.namespace }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
+    <script src="{{ url_for('static',filename='vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
+{% endblock %}

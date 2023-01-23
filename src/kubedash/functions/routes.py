@@ -5,9 +5,11 @@ import requests, json, yaml, re
 from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
     UserCreateSSO
 from functions.sso import SSOServerCreate, SSOSererGet, get_auth_server_info
-from functions.k8s import k8sConfigCreate, k8sConfigGet, \
+from functions.k8s import k8sConfigCreate, k8sConfigGet, k8sGetNodesList, \
     k8sGetNamespaceList, k8sGetNamespaces, k8sCreateNamespace, k8sDeleteNamespace, \
-    k8sGetUserClusterRoleTemplateList, k8sGetUserRoleTemplateList, k8sGetNodesList
+    k8sGetUserClusterRoleTemplateList, k8sGetUserRoleTemplateList, \
+    k8sGetStatefulSets, k8sGetDaemonSets, k8sGetDeployments, k8sGetReplicaSets, \
+    k8sGetPodList, k8sGetPod, k8sGetPodVuls
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -239,7 +241,7 @@ def callback():
         return redirect(url_for('login'))
     else:
         ssoServer = SSOSererGet()
-        oauth, auth_server_info = get_auth_server_info()
+        auth_server_info, oauth = get_auth_server_info()
         token_url = auth_server_info["token_endpoint"]
         userinfo_url = auth_server_info["userinfo_endpoint"]
 
@@ -303,7 +305,7 @@ def callback():
 
 @app.route('/dtlogin')
 def index():
-    oauth, auth_server_info = get_auth_server_info()
+    auth_server_info, oauth = get_auth_server_info()
     auth_url = auth_server_info["authorization_endpoint"]
 
     authorization_url, state = oauth.authorization_url(
@@ -321,7 +323,6 @@ def k8s_config():
     user_tmp = User.query.filter_by(username=current_username).first()
     username_role = user_tmp.role
     if request.method == 'POST':
-        print(request.form)
         k8s_server_url = request.form['k8s_server_url']
         k8s_context = request.form['k8s_context']
         k8s_server_ca = str(base64_encode(request.form['k8s_server_ca']), 'UTF-8')
@@ -478,7 +479,7 @@ def get_file():
             }
     )
 ##############################################################
-## Kubernetes Cluster
+## Cluster
 ##############################################################
 ## Nodes
 ##############################################################
@@ -571,3 +572,206 @@ def namespaces_delete():
         return redirect(url_for('namespaces'))
     else:
         return redirect(url_for('namespaces'))
+
+##############################################################
+## Workloads
+##############################################################
+## Statefullsets
+##############################################################
+
+@app.route("/statefulsets", methods=['GET', 'POST'])
+@login_required
+def statefulsets():
+    ns_select = "default"
+    tr_select = None
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
+    username_type = user_tmp.user_type
+
+    if request.method == 'POST':
+        ns_select = request.form.get('ns_select')
+        tr_select = request.form.get('tr_select')
+        
+    if username_type == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    statefulset_list = k8sGetStatefulSets(username_role, user_token, ns_select)
+    namespace_list = k8sGetNamespaceList(username_role, user_token)
+
+    return render_template(
+        'statefulsets.html',
+        ns_select = ns_select,
+        tr_select = tr_select,
+        statefulsets = statefulset_list,
+        username_role = username_role,
+        current_username = current_username,
+        namespaces = namespace_list,
+    )
+
+##############################################################
+## Daemonsets
+##############################################################
+
+@app.route("/daemonsets", methods=['GET', 'POST'])
+@login_required
+def daemonsets():
+    ns_select = "default"
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
+    username_type = user_tmp.user_type
+
+    if request.method == 'POST':
+        ns_select = request.form.get('ns_select')
+
+    if username_type == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    daemonset_list = k8sGetDaemonSets(username_role, user_token, ns_select)
+    namespace_list = k8sGetNamespaceList(username_role, user_token)
+
+    return render_template(
+        'daemonsets.html',
+        ns_select = ns_select,
+        daemonsets = daemonset_list,
+        username_role = username_role,
+        current_username = current_username,
+        namespaces = namespace_list,
+    )
+
+##############################################################
+## Deployments
+##############################################################
+
+@app.route("/deployments", methods=['GET', 'POST'])
+@login_required
+def deployments():
+    ns_select = "default"
+    tr_select = None
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
+    username_type = user_tmp.user_type
+
+    if request.method == 'POST':
+        ns_select = request.form.get('ns_select')
+        tr_select = request.form.get('tr_select')
+
+    if username_type == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    deployments_list = k8sGetDeployments(username_role, user_token, ns_select)
+    namespace_list = k8sGetNamespaceList(username_role, user_token)
+
+    return render_template(
+        'deployments.html',
+        ns_select = ns_select,
+        tr_select = tr_select,
+        deployments = deployments_list,
+        username_role = username_role,
+        current_username = current_username,
+        namespaces = namespace_list,
+    )
+
+##############################################################
+## ReplicaSets
+##############################################################
+
+@app.route("/replicasets", methods=['GET', 'POST'])
+@login_required
+def replicasets():
+    ns_select = "default"
+    tr_select = None
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
+    username_type = user_tmp.user_type
+
+    if request.method == 'POST':
+        ns_select = request.form.get('ns_select')
+        tr_select = request.form.get('tr_select')
+
+    if username_type == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    replicaset_list = k8sGetReplicaSets(username_role, user_token, ns_select)
+    namespace_list = k8sGetNamespaceList(username_role, user_token)
+
+    return render_template(
+        'replicasets.html',
+        replicasets = replicaset_list,
+        username_role = username_role,
+        namespaces = namespace_list,
+        current_username = current_username,
+        ns_select = ns_select,
+        tr_select = tr_select,
+    )
+##############################################################
+## Pods
+##############################################################
+
+@app.route("/pods", methods=['GET', 'POST'])
+@login_required
+def pods():
+    ns_select = "default"
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
+    username_type = user_tmp.user_type
+
+    if request.method == 'POST':
+        ns_select = request.form.get('ns_select')
+
+    if username_type == "OpenID":
+        user_token = session['oauth_token']
+    else:
+        user_token = None
+
+    pod_list = k8sGetPodList(username_role, user_token, ns_select)
+    namespace_list = k8sGetNamespaceList(username_role, user_token)
+
+    return render_template(
+        'pods.html',
+        pods = pod_list,
+        username_role = username_role,
+        namespaces = namespace_list,
+        current_username = current_username,
+        ns_select = ns_select,
+    )
+
+@app.route('/pod-data', methods=['GET', 'POST'])
+@login_required
+def pods_data():
+    if request.method == 'POST':
+        po_name = request.form.get('po_name')
+        ns_name = request.form.get('ns_name')
+        current_username = current_user.username
+        user_tmp = User.query.filter_by(username=current_username).first()
+        username_role = user_tmp.role
+        username_type = user_tmp.user_type
+
+        if username_type == "OpenID":
+            user_token = session['oauth_token']
+        else:
+            user_token = None
+
+        pod_data = k8sGetPod(username_role, user_token, ns_name, po_name)
+
+        return render_template(
+            'pod-data.html',
+            po_now = po_name,
+            pod_data = pod_data,
+            username_role = username_role,
+            current_username = current_username,
+        )
+    else:
+        return redirect(url_for('login'))

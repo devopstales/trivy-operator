@@ -440,3 +440,276 @@ def k8sGetNodesList(username_role, user_token):
     else:
         ErrorHandler(error, "get node list")
         return NODE_LIST
+
+##############################################################
+## StatefulSets
+##############################################################
+
+def k8sGetStatefulSets(username_role, user_token, ns):
+    k8sGetConfig(username_role, user_token)
+    STATEFULSET_LIST = list()
+    try:
+        statefulset_list = k8s_client.AppsV1Api().list_namespaced_stateful_set(ns)
+        for sfs in statefulset_list.items:
+            STATEFULSET_DATA = {
+                "name": sfs.metadata.name,
+                "desired": "",
+                "current": "",
+                "ready": "",
+            }
+            if sfs.status.replicas:
+                STATEFULSET_DATA['desired'] = sfs.status.replicas
+            else:
+                STATEFULSET_DATA['desired'] = 0
+            if sfs.status.current_replicas:
+                STATEFULSET_DATA['current'] = sfs.status.current_replicas
+            else:
+                STATEFULSET_DATA['current'] = 0
+            if sfs.status.ready_replicas:
+                STATEFULSET_DATA['ready'] = sfs.status.ready_replicas
+            else:
+                STATEFULSET_DATA['ready'] = 0
+            STATEFULSET_LIST.append(STATEFULSET_DATA)
+        return STATEFULSET_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get statefullsets list")
+        return STATEFULSET_LIST
+
+##############################################################
+## DaemonSets
+##############################################################
+
+def k8sGetDaemonSets(username_role, user_token, ns):
+    k8sGetConfig(username_role, user_token)
+    DAEMONSET_LIST = list()
+    try:
+        daemonset_list = k8s_client.AppsV1Api().list_namespaced_daemon_set(ns)
+        for ds in daemonset_list.items:
+            DAEMONSET_DATA = {
+                "name": ds.metadata.name,
+                "desired": "",
+                "current": "",
+                "ready": "",
+            }
+            if ds.status.desired_number_scheduled:
+                DAEMONSET_DATA['desired'] = ds.status.desired_number_scheduled
+            else:
+                DAEMONSET_DATA['desired'] = 0
+            if ds.status.current_number_scheduled:
+                DAEMONSET_DATA['current'] = ds.status.current_number_scheduled
+            else:
+                DAEMONSET_DATA['current'] = 0
+            if ds.status.number_ready:
+                DAEMONSET_DATA['ready'] = ds.status.number_ready
+            else:
+                DAEMONSET_DATA['ready'] = 0
+            DAEMONSET_LIST.append(DAEMONSET_DATA)
+        return DAEMONSET_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get daemonsets list")
+        return DAEMONSET_LIST
+
+##############################################################
+## Deployments
+##############################################################
+
+def k8sGetDeployments(username_role, user_token, ns):
+    k8sGetConfig(username_role, user_token)
+    DEPLOYMENT_LIST = list()
+    try:
+        deployment_list = k8s_client.AppsV1Api().list_namespaced_deployment(ns)
+        for d in deployment_list.items:
+            DEPLOYMENT_DATA = {
+                "name": d.metadata.name,
+                "status": "",
+            }
+            if d.status.ready_replicas and d.status.replicas:
+                DEPLOYMENT_DATA['status'] = "%s/%s" % (d.status.ready_replicas, d.status.replicas)
+            else:
+                DEPLOYMENT_DATA['status'] = "0/0"
+            DEPLOYMENT_LIST.append(DEPLOYMENT_DATA)
+        return DEPLOYMENT_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get deployments list")
+        return DEPLOYMENT_LIST
+
+##############################################################
+## ReplicaSets
+##############################################################
+
+def k8sGetReplicaSets(username_role, user_token, ns):
+    k8sGetConfig(username_role, user_token)
+    REPLICASET_LIST = list()
+    try:
+        replicaset_list = k8s_client.AppsV1Api().list_namespaced_replica_set(ns)
+        for rs in replicaset_list.items:
+            REPLICASET_DATA = {
+                "name": rs.metadata.name,
+                "owner": "",
+                "desired": "",
+                "current": "",
+                "ready": "",
+            }
+            if rs.status.fully_labeled_replicas:
+                REPLICASET_DATA['desired'] = rs.status.fully_labeled_replicas
+            else:
+                REPLICASET_DATA['desired'] = 0
+            if rs.status.available_replicas:
+                REPLICASET_DATA['current'] = rs.status.available_replicas
+            else:
+                REPLICASET_DATA['current'] = 0
+            if rs.status.ready_replicas:
+                REPLICASET_DATA['ready'] = rs.status.ready_replicas
+            else:
+                REPLICASET_DATA['ready'] = 0
+            if rs.metadata.owner_references:
+                for owner in rs.metadata.owner_references:
+                    REPLICASET_DATA['owner'] = "%ss/%s" % (owner.kind.lower(), owner.name)
+            REPLICASET_LIST.append(REPLICASET_DATA)
+        return REPLICASET_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get replicasets list")
+        return REPLICASET_LIST
+
+##############################################################
+## Pods
+##############################################################
+
+def k8sGetPodList(username_role, user_token, ns):
+    k8sGetConfig(username_role, user_token)
+    POD_LIST = list()
+    print(ns)
+    try:
+        pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns)
+        for pod in pod_list.items:
+            POD_SUM = {
+                "name": pod.metadata.name,
+                "status": pod.status.phase,
+                "owner": "",
+                "pod_ip": pod.status.pod_ip,
+            }
+            if pod.metadata.owner_references:
+                for owner in pod.metadata.owner_references:
+                    POD_SUM['owner'] = "%ss/%s" % (owner.kind.lower(), owner.name)
+            POD_LIST.append(POD_SUM)
+        return POD_LIST
+    except ApiException as error:
+        ErrorHandler(error, "get pod list")
+        return POD_LIST
+
+def k8sGetPod(username_role, user_token, ns, po):
+    k8sGetConfig(username_role, user_token)
+    POD_DATA = {}
+    try: 
+        pod_data = k8s_client.CoreV1Api().read_namespaced_pod(po, ns)
+        POD_DATA = {
+            # main
+            "name": po, # X
+            "namespace": ns, # X
+            "labels": list(), # X
+            "owner": "", # X
+            "node": pod_data.spec.node_name, # X
+            "priority": pod_data.spec.priority, # X
+            "priority_class_name": pod_data.spec.priority_class_name, # X
+            "runtime_class_name": pod_data.spec.runtime_class_name, # X
+            # Containers
+            "containers": list(), # X
+            "init_containers": list(), # X
+            #  Related Resources
+            "image_pull_secrets": [], # X
+            "service_account": pod_data.spec.service_account_name, # X
+            "pvc": list(), # X
+            "cm": list(), # X
+            "secrets": list(),
+            # Security
+            "security_context": pod_data.spec.security_context.to_dict(),
+            # Conditions
+            "conditions": list(),
+        }
+        for key, value in pod_data.metadata.labels.items():
+            label = {
+                key: value
+            }
+            POD_DATA['labels'].append(label)
+        if pod_data.metadata.owner_references:
+            for owner in pod_data.metadata.owner_references:
+                POD_DATA['owner'] = "%ss/%s" % (owner.kind.lower(), owner.name)
+        for c in  pod_data.spec.containers:
+            for e in c.env:
+                ed = e.to_dict()
+                for name, val in ed.items():
+                    if "value_from" in name and val is not None:
+                        for key, value in val.items():
+                            if "secret_key_ref" in key:
+                                for n, v in value.items():
+                                    if "name" in n:
+                                        POD_DATA['secrets'].append(v)
+            for cs in pod_data.status.container_statuses:
+                if cs.name == c.name:
+                    CONTAINERS = {
+                        "name": c.name,
+                        "image": c.image,
+                        "ready": cs.ready,
+                        "restarts": cs.restart_count,
+                    }
+            POD_DATA['containers'].append(CONTAINERS)
+        if pod_data.spec.init_containers:
+            for ic in pod_data.spec.init_containers:
+                for ics in pod_data.status.init_container_statuses:
+                    if ics.name == ic.name:
+                        CONTAINERS = {
+                            "name": ic.name,
+                            "image": ic.image,
+                            "ready": ics.ready,
+                            "restarts": ics.restart_count,
+                        }
+                        POD_DATA['init_containers'].append(CONTAINERS)
+        for ips in pod_data.spec.image_pull_secrets:
+            POD_DATA['image_pull_secrets'].append(ips.to_dict())
+        for v in pod_data.spec.volumes:
+            # secret
+            if v.persistent_volume_claim:
+                POD_DATA['pvc'].append(v.persistent_volume_claim.claim_name)
+            if v.config_map:
+                POD_DATA['cm'].append(v.config_map.name)
+            if v.secret:
+                POD_DATA['secrets'].append(v.secret.secret_name)
+        for c in pod_data.status.conditions:
+            CONDITION = {
+                c.type: c.status
+            }
+            POD_DATA['conditions'].append(CONDITION)
+        return POD_DATA
+    except ApiException as error:
+        ErrorHandler(error, "get pods in this namespace")
+        return POD_DATA
+
+def k8sGetPodVuls(username_role, user_token, ns, pod):
+    k8sGetConfig(username_role, user_token)
+    POD_VULN_LIST = list()
+    POD_VULN_SUM = {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "scan_status": None,
+    }
+    try:
+        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(
+            "trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports"
+        )
+    except:
+        vulnerabilityreport_list = False
+    try:
+        for vr in vulnerabilityreport_list['items']:
+            if vr['metadata']['labels']['trivy-operator.pod.name'] == pod:
+                POD_VULN_SUM['critical'] += vr['report']['summary']['criticalCount']
+                POD_VULN_SUM['high'] += vr['report']['summary']['highCount']
+                POD_VULN_SUM['medium'] += vr['report']['summary']['mediumCount']
+                POD_VULN_SUM['low'] += vr['report']['summary']['lowCount']
+            if POD_VULN_SUM['critical'] > 0 or POD_VULN_SUM['high'] > 0 or POD_VULN_SUM['medium'] > 0 or POD_VULN_SUM['low'] > 0:
+                POD_VULN_SUM['scan_status'] = "OK"
+            POD_VULN_LIST.append(POD_VULN_SUM)
+        return POD_VULN_LIST
+    except:
+        return POD_VULN_LIST

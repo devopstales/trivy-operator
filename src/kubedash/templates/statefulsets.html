@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block header %}
+    <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
+{% endblock %}
+
+{% block content %}
+{% if get_flashed_messages() %}
+{% for category, message in get_flashed_messages(with_categories=true) %}
+<div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+  {{ message }}
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Statefullset List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Desired</th>
+                      <th>Current</th>
+                      <th>Ready</th>
+                      <th>Name</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for sfs in statefulsets %}
+                    {% if tr_select == sfs.name %}
+                      <tr class="selected" >
+                    {% else %}
+                      <tr>
+                    {% endif %}
+                        <td>{{ sfs.desired }}</td>
+                        <td>{{ sfs.current }}</td>
+                        <td>{{ sfs.ready }}</td>
+                        <td>{{ sfs.name }}</td>
+                      </tr>
+                    {% endfor %}
+              
+                  </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static',filename='vendor/datatables/jquery.dataTables.js') }}"></script>
+    <script src="{{ url_for('static',filename='vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
+
+    <!-- Page level custom scripts -->
+    <script src="{{ url_for('static',filename='js/demo/datatables-demo.js') }}"></script>
+{% endblock %}

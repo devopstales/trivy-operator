@@ -1,0 +1,8 @@
+table.dataTable tbody tr.selected>* {
+    box-shadow: inset 0 0 0 9999px rgba(13, 110, 253, 0.9);
+    color: white
+}
+
+table.dataTable tbody tr.selected a {
+    color: #090a0b
+}
