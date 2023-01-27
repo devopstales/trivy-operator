@@ -5,7 +5,7 @@
 You need to have a Kubernetes cluster, and the kubectl command-line tool must be configured to communicate with your
 cluster. If you do not already have a cluster, you can create one by installing [minikube], [kind] or [microk8s], or you can use the following [Kubernetes playground].
 
-You also need the Trivy-Operator to be installed with [Helm](../installation/).
+You also need the Trivy-Operator to be installed with [Helm](./installation.md).
 
 ## Workloads Scanning
 
