@@ -110,7 +110,7 @@ metadata:
   labels:
     app: kube-bench-scnner
     {{- include "trivy-operator.labels" . | nindent 4 }}
-  name: {{ include "kube-bench-scnner.fullname" . }}
+  name: {{ include "kube-bench-scnner.fullname" . }}-kube-bench-scnner
 spec:
   selector:
     matchLabels:
@@ -134,7 +134,8 @@ spec:
       serviceAccountName: {{ include "trivy-operator.serviceAccountName" . }}
       hostPID: true
       containers:
-      - image: "{{ .Values.kube_bench_scnner.image.repository }}:{{ .Values.kube_bench_scnner.image.tag | default .Chart.AppVersion }}"
+      - name: "kube-bench-scnner"
+        image: "{{ .Values.kube_bench_scnner.image.repository }}:{{ .Values.kube_bench_scnner.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.kube_bench_scnner.image.pullPolicy }}
         env:
         - name: TZ
