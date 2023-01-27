@@ -229,19 +229,18 @@ async def create_fn( logger, spec, **kwargs):
     def pull_secret_decoder(secret_names, secret_namespace):
         try:
             registry_list = spec['registry']
+            for secret_name in secret_names:
+                try:
+                    secret = v1.read_namespaced_secret(secret_name, secret_namespace)
+                    secret_data = secret.data['.dockerconfigjson']
+                    data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
+                    registry_list.append(data['auths'])
+                    logger.debug(format(data['auths'])) # debuglog
+                except ApiException as e:
+                    logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
+                    logger.debug("Exception when calling CoreV1Api->read_namespaced_secret: %s\n" % e) # debuglog
         except:
             logger.debug("No registry auth config is defined.") # debug
-
-        for secret_name in secret_names:
-            try:
-                secret = v1.read_namespaced_secret(secret_name, secret_namespace)
-                secret_data = secret.data['.dockerconfigjson']
-                data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
-                registry_list.append(data['auths'])
-                logger.debug(format(data['auths'])) # debuglog
-            except ApiException as e:
-                logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
-                logger.debug("Exception when calling CoreV1Api->read_namespaced_secret: %s\n" % e) # debuglog
 
     if secret_names_present:
         pull_secret_decoder(secret_names, current_namespace)
