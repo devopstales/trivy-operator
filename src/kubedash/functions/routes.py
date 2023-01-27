@@ -9,7 +9,7 @@ from functions.k8s import k8sConfigCreate, k8sConfigGet, k8sGetNodesList, \
     k8sGetNamespaceList, k8sGetNamespaces, k8sCreateNamespace, k8sDeleteNamespace, \
     k8sGetUserClusterRoleTemplateList, k8sGetUserRoleTemplateList, \
     k8sGetStatefulSets, k8sGetDaemonSets, k8sGetDeployments, k8sGetReplicaSets, \
-    k8sGetPodList, k8sGetPod, k8sGetPodVuls
+    k8sGetPodList, k8sGetPod, k8sGetPodListVuls, k8sGetPodVuls
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -736,12 +736,14 @@ def pods():
     else:
         user_token = None
 
-    pod_list = k8sGetPodList(username_role, user_token, ns_select)
+    #pod_list = k8sGetPodList(username_role, user_token, ns_select)
+    has_report, pod_list = k8sGetPodListVuls(username_role, user_token, ns_select)
     namespace_list = k8sGetNamespaceList(username_role, user_token)
 
     return render_template(
         'pods.html',
         pods = pod_list,
+        has_report = has_report,
         username_role = username_role,
         namespaces = namespace_list,
         current_username = current_username,

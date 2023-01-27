@@ -684,6 +684,48 @@ def k8sGetPod(username_role, user_token, ns, po):
         ErrorHandler(error, "get pods in this namespace")
         return POD_DATA
 
+def k8sGetPodListVuls(username_role, user_token, ns):
+    k8sGetConfig(username_role, user_token)
+    POD_VULN_LIST = list()
+    pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns)
+    try:
+        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
+    except:
+        vulnerabilityreport_list = False
+
+    for pod in pod_list.items:
+        POD_VULN_SUM = {
+            "name": pod.metadata.name,
+            "status": pod.status.phase,
+            "owner": "",
+            "pod_ip": pod.status.pod_ip,
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0,
+            "scan_status": None,
+        }
+        if pod.metadata.owner_references:
+            for owner in pod.metadata.owner_references:
+                POD_VULN_SUM['owner'] = "%ss/%s" % (owner.kind.lower(), owner.name)
+        
+        if vulnerabilityreport_list:
+            HAS_REPORT = True
+            for vr in vulnerabilityreport_list['items']:
+                if vr['metadata']['labels']['trivy-operator.pod.name'] == pod.metadata.name:
+                    POD_VULN_SUM['critical'] += vr['report']['summary']['criticalCount']
+                    POD_VULN_SUM['high'] += vr['report']['summary']['highCount']
+                    POD_VULN_SUM['medium'] += vr['report']['summary']['mediumCount']
+                    POD_VULN_SUM['low'] += vr['report']['summary']['lowCount']
+        else:
+            HAS_REPORT = False
+
+        if POD_VULN_SUM['critical'] > 0 or POD_VULN_SUM['high'] > 0 or POD_VULN_SUM['medium'] > 0 or POD_VULN_SUM['low'] > 0:
+            POD_VULN_SUM['scan_status'] = "OK"
+        POD_VULN_LIST.append(POD_VULN_SUM)
+
+    return HAS_REPORT, POD_VULN_LIST
+
 def k8sGetPodVuls(username_role, user_token, ns, pod):
     k8sGetConfig(username_role, user_token)
     POD_VULN_LIST = list()
@@ -700,7 +742,8 @@ def k8sGetPodVuls(username_role, user_token, ns, pod):
         )
     except:
         vulnerabilityreport_list = False
-    try:
+    
+    if vulnerabilityreport_list:
         for vr in vulnerabilityreport_list['items']:
             if vr['metadata']['labels']['trivy-operator.pod.name'] == pod:
                 POD_VULN_SUM['critical'] += vr['report']['summary']['criticalCount']
@@ -710,6 +753,4 @@ def k8sGetPodVuls(username_role, user_token, ns, pod):
             if POD_VULN_SUM['critical'] > 0 or POD_VULN_SUM['high'] > 0 or POD_VULN_SUM['medium'] > 0 or POD_VULN_SUM['low'] > 0:
                 POD_VULN_SUM['scan_status'] = "OK"
             POD_VULN_LIST.append(POD_VULN_SUM)
-        return POD_VULN_LIST
-    except:
-        return POD_VULN_LIST
+    return POD_VULN_LIST

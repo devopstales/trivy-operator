@@ -2,7 +2,6 @@ import kopf, prometheus_client
 import kubernetes.client as k8s_client
 import kubernetes.config as k8s_config
 from kubernetes.client.rest import ApiException
-#import asyncio, pycron
 from croniter import croniter
 from datetime import datetime, timedelta, timezone
 import time

@@ -29,6 +29,13 @@
                       <th>Name</th>
                       <th>Pod IP</th>
                       <th>Owner</th>
+                      {% if has_report %}
+                      <th>Report</th>
+                      <th>Critical</th>
+                      <th>High</th>
+                      <th>Medium</th>
+                      <th>Low</th>
+                      {% endif %}
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -54,6 +61,13 @@
                         </td>
                         {% else %}
                           <td>-</td>
+                        {% endif %}
+                        {% if has_report %}
+                        <td>{{ po.scan_status }}</td>
+                        <td>{{ po.critical }}</td>
+                        <td>{{ po.high }}</td>
+                        <td>{{ po.medium }}</td>
+                        <td>{{ po.low }}</td>
                         {% endif %}
                         <td>
                           <form action="/pods/delete" method="post">
