@@ -230,7 +230,8 @@ async def create_fn( logger, spec, **kwargs):
         try:
             registry_list = spec['registry']
         except:
-            logger.debug("No registry auth config is defined.") # debug
+            registry_list = list()
+            logger.debug("Can't get registry auth config.") # debug
 
         for secret_name in secret_names:
             try:
