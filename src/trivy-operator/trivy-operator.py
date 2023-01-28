@@ -239,7 +239,8 @@ async def create_fn( logger, spec, **kwargs):
                     logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
                     logger.debug("Exception when calling CoreV1Api->read_namespaced_secret: %s\n" % e) # debuglog
         except:
-            logger.debug("No registry auth config is defined.") # debug
+            registry_list = list()
+            logger.debug("Can't get registry auth config.") # debug
 
     if secret_names_present:
         pull_secret_decoder(secret_names, current_namespace)
