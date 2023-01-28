@@ -53,13 +53,13 @@ jobs:
           wget -q -O /tmp/kube-bench.tar.gz https://github.com/aquasecurity/kube-bench/releases/download/v${{env.BENCH}}/kube-bench_${{env.BENCH}}_linux_amd64.tar.gz
           tar -C /tmp -xf /tmp/kube-bench.tar.gz
           mkdir docker/kube-bench-scnner/amd64
-          cp /tmp/kube-bench docker/kube-bench-scnner/amd64
+          cp /tmp/kube-bench docker/kube-bench-scnner/amd64/kube-bench
           rm -rf /tmp/kube-bench.tar.gz /tmp/kube-bench
           # arm64v8
           wget -q -O /tmp/kube-bench.tar.gz https://github.com/aquasecurity/kube-bench/releases/download/v${{env.BENCH}}/kube-bench_${{env.BENCH}}_linux_arm64.tar.gz
           tar -C /tmp -xf /tmp/kube-bench.tar.gz
-          mkdir docker/kube-bench-scnner/arm64
-          cp /tmp/kube-bench docker/kube-bench-scnner/arm64
+          mkdir docker/kube-bench-scnner/arm64v8
+          cp /tmp/kube-bench docker/kube-bench-scnner/arm64v8/kube-bench
           rm -rf /tmp/kube-bench.tar.gz /tmp/kube-bench
 
       - name: Build amd64 trivy-operator
