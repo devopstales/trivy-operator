@@ -2,6 +2,7 @@
 
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -33,7 +34,11 @@
                   </thead>
                   <tbody>
                     {% for ds in daemonsets %}
+                    {% if tr_select == ds.name %} 
+                      <tr class="selected" >
+                    {% else %}
                       <tr>
+                    {% endif %}
                         <td>{{ ds.desired }}</td>
                         <td>{{ ds.current }}</td>
                         <td>{{ ds.ready }}</td>

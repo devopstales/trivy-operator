@@ -42,7 +42,17 @@
                   <tbody>
                     {% for po in pods %}
                       <tr>
-                        <td>{{ po.status }}</td>
+                        <td>
+                        {% if po.status == "Running" %}
+                          <span class="badge badge-success">{{ po.status }}</span>
+                        {% elif po.status == "Pending" %}
+                          <span class="badge badge-warning">{{ po.status }}</span>
+                        {% elif po.status == "Succeeded" %}
+                          <span class="badge badge-secondary">{{ po.status }}</span>
+                        {% else %}
+                          <span class="badge badge-info">{{ po.status }}</span>
+                        {% endif %}
+                        </td>
                         <td>
                           <form action="/pod-data" method="post">
                             <input type="hidden" name="ns_name" value="{{ ns_select }}" />
@@ -63,11 +73,19 @@
                           <td>-</td>
                         {% endif %}
                         {% if has_report %}
-                        <td>{{ po.scan_status }}</td>
-                        <td>{{ po.critical }}</td>
-                        <td>{{ po.high }}</td>
-                        <td>{{ po.medium }}</td>
-                        <td>{{ po.low }}</td>
+                        <td>
+                          {% if po.scan_status == "OK" %}
+                            <span class="badge badge-success">{{ po.scan_status }}</span>
+                          {% elif po.scan_status == "Error" %}
+                            <span class="badge badge-warning">{{ po.scan_status }}</span>
+                          {% else %}
+                            <span class="badge badge-info">{{ po.scan_status }}</span>
+                          {% endif %}
+                        </td>
+                        <td><span class="badge badge-danger">{{ po.critical }}</span></td>
+                        <td><span class="badge badge-warning">{{ po.high }}</span></td>
+                        <td><span class="badge badge-primary">{{ po.medium }}</span></td>
+                        <td><span class="badge badge-secondary">{{ po.low }}</span></td>
                         {% endif %}
                         <td>
                           <form action="/pods/delete" method="post">

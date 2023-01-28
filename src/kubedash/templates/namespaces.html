@@ -80,7 +80,13 @@
                 <tbody>
                     {% for ns in namespace_list %}
                     <tr>
-                      <td>{{ ns.staus }}</td>
+                      <td>
+                      {% if ns.status == "Active" %}
+                        <span class="badge badge-success">{{ ns.status }}</span>
+                      {% else %}
+                        <span class="badge badge-danger">{{ ns.status }}</span>
+                      {% endif %}
+                      </td>
                       <td>{{ ns.name }}</td>
                       <td>
                         {% if username_role == "Admin" %}

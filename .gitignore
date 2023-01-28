@@ -5,7 +5,8 @@ docker/trivy
 docker/trivy-operator/trivy
 docker/kube-bench-scnner/kube-bench
 old/
-note.md
+*note.md
+*ToDo.md
 test*
 *.crt
 

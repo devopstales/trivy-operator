@@ -2,6 +2,7 @@
 
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/datatables/jquery.dataTables.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -36,8 +37,18 @@
                   </thead>
                   <tbody>
                     {% for no in nodes %}
+                    {% if tr_select == no.name %} 
+                      <tr class="selected" >
+                    {% else %}
                       <tr>
-                        <td>{{ no.status }}</td>
+                    {% endif %}
+                        <td>
+                    {% if no.status == "Ready" %}
+                          <span class="badge badge-success">{{ no.status }}</span>
+                    {% else %}
+                          <span class="badge badge-danger"></span>{{ no.status }}</span>
+                    {% endif %}
+                        </td>
                         <td>{{ no.name }}</td>
                         <td>{{ no.role }}</td>
                         <td>{{ no.version }}</td>

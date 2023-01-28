@@ -15,55 +15,125 @@
 {% endfor %}
 {% endif %}
 
-<nav class="navbar navbar-light bg-light row"></nav>
+<nav class="navbar navbar-light bg-light row">
+    <div class="col"></div>
+    <!-- Button trigger modal add -->
+    {% if username_role == "Admin" %}
+    <button type="button" class="btn btn-success float-right col-1 me-lg-4" data-toggle="modal" data-target="#modaladd">
+      Add User
+    </button>
+    {% endif %}
 
-<div class="card mb-4 mx-5">
-    <div class="card-header py-3">
-      <h5 class="m-0 font-weight-bold text-primary" id="KubernetesApiServer">Kubernetes ApiServer Config</h5>
+  <!-- Modal Add User -->
+    <div class="modal fade" id="modaladd" tabindex="-1" role="dialog" aria-labelledby="modaladdLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modaladdLabel">Create User</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form action="/k8s-config" method="POST">
+                        <div class="form-group">
+                            <label for="k8s_context">Kubernetes Config Context</label>
+                            <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="Server Context">
+                        </div>
+                        <div class="form-group">
+                            <label for="k8s_server_url">Kubernetes API URL</label>
+                            <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="URL">
+                        </div>
+                        <div class="form-group">
+                            <label for="k8s_server_ca">Kubernetes CA Certificate</label>
+                            <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3"></textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <div class="form-group mt-2">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                <button type="submit" class="btn btn-primary" >Add</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
-    
+  <!-- Modal Add User -->
+
+</nav>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Kubernetes Server List</h6>
+    </div>
     <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                      <th>Context</th>
+                      <th>URL</th>
+                      <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for server in k8s_servers %}
+                    <tr>
+                        <td>{{ server.k8s_context }}</td>
+                        <td>{{ server.k8s_server_url }}</td>
+                        <td>
+                            {% if username_role == "Admin" %}
+                            <button type="button" class="btn btn-warning btn-xs" data-toggle="modal" data-target="#modaledit{{ server.k8s_context }}">Edit</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Config -->
+{% for server in k8s_servers %}
+<div class="modal fade" id="modaledit{{ server.k8s_context }}" tabindex="-1" role="dialog" aria-labelledby="modaleditLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modaleditLabel">Update Information</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
         <form action="/k8s-config" method="POST">
-            <div class="messages"></div>
-            <div class="col-sm-4">
-                <div class="form-group">
-                    <label for="k8s_server_url">Kubernetes API URL</label>
-                    {% if k8s_server_url %}
-                    <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="{{ k8s_server_url }}">
-                    {% else %}
-                    <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" placeholder="URL">
-                    {% endif %}
-                </div>
+            <div class="form-group">
+                <label for="k8s_context">Kubernetes Config Context</label>
+                <input type="text" class="form-control" id="k8s_context" name= "k8s_context" value="{{ server.k8s_context }}">
             </div>
-            <div class="col-sm-4">
-                <div class="form-group">
-                    <label for="k8s_context">Kubernetes Config Context</label>
-                    {% if k8s_context %}
-                    <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="{{ k8s_context }}">
-                    {% else %}
-                    <input type="text" class="form-control" id="k8s_context" name= "k8s_context" placeholder="URL">
-                    {% endif %}
-                </div>
+            <div class="form-group">
+                <label for="k8s_server_url">Kubernetes API URL</label>
+                <input type="text" class="form-control" id="k8s_server_url" name= "k8s_server_url" value="{{ server.k8s_server_url }}">
             </div>
-            <div class="col-sm-4">
-                <div class="form-group">
-                    <label for="k8s_server_ca">Kubernetes CA Certificate</label>
-                    {% if k8s_server_ca %}
-                    <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3">{{ k8s_server_ca }}</textarea>
-                    {% else %}
-                    <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3"></textarea>
-                    {% endif %}
-                </div>
+            <div class="form-group">
+                <label for="k8s_server_ca">Kubernetes CA Certificate</label>
+                <textarea class="form-control" id="k8s_server_ca" name= "k8s_server_ca" rows="3">{{ server.k8s_server_ca }}</textarea>
             </div>
-            <div class="col-sm-4">
+            <div class="modal-footer">
                 <div class="form-group mt-2">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                     <button type="submit" class="btn btn-primary" >Add</button>
                 </div>
             </div>
-            </form>
         </form>
     </div>
   </div>
+</div>
+{% endfor %}
+<!-- Modal Edit User -->
+
 {% endblock %}
 
 {% block scripts %}

@@ -5,11 +5,13 @@ import requests, json, yaml, re
 from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
     UserCreateSSO
 from functions.sso import SSOServerCreate, SSOSererGet, get_auth_server_info
-from functions.k8s import k8sConfigCreate, k8sConfigGet, k8sGetNodesList, \
+from functions.k8s import k8sServerConfigCreate, k8sServerConfigGet, k8sServerConfigList, \
+    k8sGetNodesList, \
     k8sGetNamespaceList, k8sGetNamespaces, k8sCreateNamespace, k8sDeleteNamespace, \
     k8sGetUserClusterRoleTemplateList, k8sGetUserRoleTemplateList, \
     k8sGetStatefulSets, k8sGetDaemonSets, k8sGetDeployments, k8sGetReplicaSets, \
-    k8sGetPodList, k8sGetPod, k8sGetPodListVuls, k8sGetPodVuls
+    k8sGetPodList, k8sGetPod, \
+    k8sGetPodListVuls, k8sGetPodVuls
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -264,7 +266,7 @@ def callback():
             remote_addr = request.environ['HTTP_X_FORWARDED_FOR']
 
 ## Kubectl config
-        k8sConfig = k8sConfigGet()
+        k8sConfig = k8sServerConfigGet()
         if k8sConfig is None:
             app.logger.error ("Kubectl Integration is not configured.")
         else:
@@ -319,44 +321,27 @@ def index():
 @app.route('/k8s-config', methods=['GET', 'POST'])
 @login_required
 def k8s_config():
-    current_username = current_user.username
-    user_tmp = User.query.filter_by(username=current_username).first()
-    username_role = user_tmp.role
     if request.method == 'POST':
         k8s_server_url = request.form['k8s_server_url']
         k8s_context = request.form['k8s_context']
         k8s_server_ca = str(base64_encode(request.form['k8s_server_ca']), 'UTF-8')
-        
 
-        k8sConfigCreate(k8s_server_url, k8s_context, k8s_server_ca)
+        k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca)
         flash("Kubernetes Config Updated Successfully", "success")
 
-        return render_template(
-            'k8s.html',
-            k8s_server_url = k8s_server_url,
-            k8s_context = k8s_context,
-            k8s_server_ca = k8s_server_ca,
-            current_username = current_username,
-            username_role = username_role,
-        )
-    else:
-        k8sConfig = k8sConfigGet()
-        if k8sConfig is None:
-            return render_template(
-                'k8s.html',
-                current_username = current_username,
-                username_role = username_role,
-            )
-        else:
-            k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
-            return render_template(
-                'k8s.html',
-                k8s_server_url = k8sConfig.k8s_server_url,
-                k8s_context = k8sConfig.k8s_context,
-                k8s_server_ca = k8s_server_ca,
-                current_username = current_username,
-                username_role = username_role,
-            )
+    current_username = current_user.username
+    user_tmp = User.query.filter_by(username=current_username).first()
+    username_role = user_tmp.role
+    k8s_servers = k8sServerConfigList()
+
+    return render_template(
+        'k8s.html',
+        current_username = current_username,
+        username_role = username_role,
+        k8s_servers = k8s_servers,
+    )
+
+
 
 @app.route('/export')
 @login_required
@@ -374,7 +359,7 @@ def export():
     else:
         ssoServer = SSOSererGet()
         redirect_uri = ssoServer.base_uri+"/callback"
-        k8sConfig = k8sConfigGet()
+        k8sConfig = k8sServerConfigGet()
         k8s_server_ca = str(base64_decode(k8sConfig.k8s_server_ca), 'UTF-8')
         auth_server_info, oauth = get_auth_server_info()
 
@@ -413,7 +398,7 @@ def export():
 @app.route("/get-file")
 def get_file():
     ssoServer = SSOSererGet()
-    k8sConfig = k8sConfigGet()
+    k8sConfig = k8sServerConfigGet()
     auth_server_info, oauth = get_auth_server_info()
     token_url = auth_server_info["token_endpoint"]
     verify = False
@@ -484,15 +469,18 @@ def get_file():
 ## Nodes
 ##############################################################
 
-@app.route("/nodes")
+@app.route("/nodes", methods=['GET', 'POST'])
 @login_required
 def nodes():
+    tr_select = None
     current_username = current_user.username
     user_tmp = User.query.filter_by(username=current_username).first()
     username_role = user_tmp.role
     username_type = user_tmp.user_type
 
-    users = User.query
+    if request.method == 'POST':
+        tr_select = request.form.get('tr_select')
+
     if username_type == "OpenID":
         user_token = session['oauth_token']
     else:
@@ -505,6 +493,7 @@ def nodes():
         nodes = node_data,
         current_username = current_username,
         username_role = username_role,
+        tr_select = tr_select,
     )
 
 ##############################################################
@@ -619,6 +608,7 @@ def statefulsets():
 @login_required
 def daemonsets():
     ns_select = "default"
+    tr_select = None
     current_username = current_user.username
     user_tmp = User.query.filter_by(username=current_username).first()
     username_role = user_tmp.role
@@ -626,6 +616,7 @@ def daemonsets():
 
     if request.method == 'POST':
         ns_select = request.form.get('ns_select')
+        tr_select = request.form.get('tr_select')
 
     if username_type == "OpenID":
         user_token = session['oauth_token']
@@ -642,6 +633,7 @@ def daemonsets():
         username_role = username_role,
         current_username = current_username,
         namespaces = namespace_list,
+        tr_select = tr_select,
     )
 
 ##############################################################
