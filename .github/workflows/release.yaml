@@ -70,6 +70,7 @@ jobs:
             ARCH=amd64/
           tags: devopstales/trivy-operator:${{github.ref_name}}-amd64
           push: true
+          provence: false
 
       - name: Build arm64v8 trivy-operator
         uses: docker/build-push-action@v2
@@ -79,12 +80,13 @@ jobs:
             ARCH=arm64v8/
           tags: devopstales/trivy-operator:${{github.ref_name}}-arm64v8
           push: true
+          provence: false
 
       - name: Create and push trivy-operator manifest images
         uses: Noelware/docker-manifest-action@master
         with:
-          base-image: devopstales/trivy-operator:${{github.ref_name}}
-          extra-images: devopstales/trivy-operator:${{github.ref_name}}-amd64,devopstales/trivy-operator:${{github.ref_name}}-arm64v8
+          inputs: devopstales/trivy-operator:${{github.ref_name}}
+          images: devopstales/trivy-operator:${{github.ref_name}}-amd64,devopstales/trivy-operator:${{github.ref_name}}-arm64v8
           push: true
 
       - name: Build amd64 kube-bench-scnner
@@ -95,8 +97,9 @@ jobs:
             ARCH=amd64/
           tags: devopstales/kube-bench-scnner:${{github.ref_name}}-amd64
           push: true
+          provence: false
 
-      - name: Build arm64v8 trivy
+      - name: Build arm64v8 kube-bench-scnner
         uses: docker/build-push-action@v2
         with:
           context: docker/kube-bench-scnner/
@@ -104,12 +107,13 @@ jobs:
             ARCH=arm64v8/
           tags: devopstales/kube-bench-scnner:${{github.ref_name}}-arm64v8
           push: true
+          provence: false
 
       - name: Create and push kube-bench-scnner manifest images
         uses: Noelware/docker-manifest-action@master
         with:
-          base-image: devopstales/kube-bench-scnner:${{github.ref_name}}
-          extra-images: devopstales/kube-bench-scnner:${{github.ref_name}}-amd64,devopstales/kube-bench-scnner:${{github.ref_name}}-arm64v8
+          inputs: devopstales/kube-bench-scnner:${{github.ref_name}}
+          images: devopstales/kube-bench-scnner:${{github.ref_name}}-amd64,devopstales/kube-bench-scnner:${{github.ref_name}}-arm64v8
           push: true
 
       - name: Create Release
