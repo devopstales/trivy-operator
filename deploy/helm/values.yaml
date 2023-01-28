@@ -4,7 +4,7 @@ image:
   # -- The docker image pull policy
   pullPolicy: Always
   # -- The docker image tag to use
-  tag: "2.5.0"
+  tag: "2.5"
 
 # -- Time Zone in container
 TimeZone: UTC
@@ -79,7 +79,7 @@ grafana:
 
 persistence:
   # -- Volumes for the pod
-  enabled: true
+  enabled: false
   # -- Volumes mode
   accessMode: "ReadWriteOnce"
   # -- Volumes size
@@ -97,7 +97,7 @@ persistence:
 
 # content foc ns-scan CRD
 namespaceScanner:
-  crontab: "*/5 * * * *"
+  crontab: "00 * * * *"
   namespaceSelector: "trivy-scan"
   clusterWide: false
   integrations:
@@ -120,7 +120,7 @@ clusterScanner:
   # -- enable clusterScanner cr creation
   enabled: false
   # -- crontab for scheduled scan
-  crontab: "*/1 * * * *"
+  crontab: "00 * * * *"
   # -- kube-hunter scan profile
   scanProfileName: "cis-1.23"
   # -- configure defectdojo integration

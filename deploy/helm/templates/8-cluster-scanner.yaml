@@ -1,6 +1,6 @@
 {{- if .Values.clusterScanner.enabled }}
 apiVersion: trivy-operator.devopstales.io/v1
-kind: NamespaceScanner
+kind: ClusterScanner
 metadata:
   name: {{ include "trivy-operator.fullname" . }}-main-config
   annotations:
