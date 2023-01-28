@@ -70,7 +70,7 @@ jobs:
             ARCH=amd64/
           tags: devopstales/trivy-operator:${{github.ref_name}}-amd64
           push: true
-          provence: false
+          provenance: false
 
       - name: Build arm64v8 trivy-operator
         uses: docker/build-push-action@v3.3.0
@@ -80,7 +80,7 @@ jobs:
             ARCH=arm64v8/
           tags: devopstales/trivy-operator:${{github.ref_name}}-arm64v8
           push: true
-          provence: false
+          provenance: false
 
       - name: Create and push trivy-operator manifest images
         uses: Noelware/docker-manifest-action@master
@@ -97,7 +97,7 @@ jobs:
             ARCH=amd64/
           tags: devopstales/kube-bench-scnner:${{github.ref_name}}-amd64
           push: true
-          provence: false
+          provenance: false
 
       - name: Build arm64v8 kube-bench-scnner
         uses: docker/build-push-action@v3.3.0
@@ -107,7 +107,7 @@ jobs:
             ARCH=arm64v8/
           tags: devopstales/kube-bench-scnner:${{github.ref_name}}-arm64v8
           push: true
-          provence: false
+          provenance: false
 
       - name: Create and push kube-bench-scnner manifest images
         uses: Noelware/docker-manifest-action@master
