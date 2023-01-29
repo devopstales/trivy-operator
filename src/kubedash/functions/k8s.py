@@ -16,7 +16,7 @@ from functions.logger import logger
 class k8sConfig(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     k8s_server_url = db.Column(db.Text, unique=True, nullable=False)
-    k8s_context = db.Column(db.Text, nullable=False)
+    k8s_context = db.Column(db.Text, unique=True, nullable=False)
     k8s_server_ca = db.Column(db.Text, nullable=False)
 
     def __repr__(self):
@@ -35,10 +35,26 @@ def k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca):
 
 def k8sServerConfigGet():
     # User.query.filter_by(username=current_username).first()
-    return k8sConfig.query.get(1)
+    k8s_config_list = k8sConfig.query.get(1)
+    return k8s_config_list
 
 def k8sServerConfigList():
-    return k8sConfig.query
+    k8s_config_list = k8sConfig.query
+    return k8s_config_list
+
+def k8sServerDelete(k8s_context):
+    k8s = k8sConfig.query.filter_by(k8s_context=k8s_context).first()
+    if k8s:
+        db.session.delete(k8s)
+        db.session.commit()
+
+def k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_server_ca):
+    k8s = k8sConfig.query.filter_by(k8s_context=k8s_context_old).first()
+    if k8s:
+        k8s.k8s_server_url = k8s_server_url
+        k8s.k8s_context = k8s_context
+        k8s.k8s_server_ca = k8s_server_ca
+        db.session.commit()
 
 ##############################################################
 ## Kubernetes Config
@@ -87,7 +103,7 @@ def k8sListNamespaces(username_role, user_token):
         namespace_list = ""
         return namespace_list, e
 
-def k8sGetNamespaceList(username_role, user_token):
+def k8sNamespaceListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     namespace_list = []
     try:
@@ -102,7 +118,7 @@ def k8sGetNamespaceList(username_role, user_token):
     except:
         return namespace_list
 
-def k8sGetNamespaces(username_role, user_token):
+def k8sNamespacesGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     NAMESPACE_LIST = []
     try:
@@ -123,7 +139,7 @@ def k8sGetNamespaces(username_role, user_token):
     except:
         return NAMESPACE_LIST
 
-def k8sCreateNamespace(username_role, user_token, ns_name):
+def k8sNamespaceCreate(username_role, user_token, ns_name):
     k8sClientConfigGet(username_role, user_token)
     pretty = 'true'
     field_manager = 'KubeDash'
@@ -145,7 +161,7 @@ def k8sCreateNamespace(username_role, user_token, ns_name):
     except ApiException as error:
         ErrorHandler(error, "create namespace")
 
-def k8sDeleteNamespace(username_role, user_token, ns_name):
+def k8sNamespaceDelete(username_role, user_token, ns_name):
     k8sClientConfigGet(username_role, user_token)
     pretty = 'true'
     with k8s_client.ApiClient() as api_client:
@@ -160,7 +176,7 @@ def k8sDeleteNamespace(username_role, user_token, ns_name):
 ## Kubernetes User Role template
 ##############################################################
 
-def k8sGetUserClusterRoleTemplateList(username_role, user_token):
+def k8sUserClusterRoleTemplateListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_LIST = list()
     try:
@@ -175,7 +191,7 @@ def k8sGetUserClusterRoleTemplateList(username_role, user_token):
     except ApiException as error:
         ErrorHandler(error, "get cluster roles")
 
-def k8sGetUserRoleTemplateList(username_role, user_token):
+def k8sUserRoleTemplateListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     CLUSTER_ROLE_LIST = list()
     try:
@@ -194,7 +210,7 @@ def k8sGetUserRoleTemplateList(username_role, user_token):
 ## Kubernetes Cluster Role
 ##############################################################
 
-def k8sGetClusterRole(name):
+def k8sClusterRoleGet(name):
     k8sClientConfigGet("Admin", None)
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
@@ -211,7 +227,7 @@ def k8sGetClusterRole(name):
         else:
             return False, None
 
-def k8sCreateClusterRole(name, body):
+def k8sClusterRoleCreate(name, body):
     k8sClientConfigGet("Admin", None)
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.RbacAuthorizationV1Api(api_client)
@@ -229,7 +245,7 @@ def k8sCreateClusterRole(name, body):
         else:
             return False
 
-def k8sAddClusterRoles():
+def k8sClusterRolesAdd():
     admin = k8s_client.V1ClusterRole(
             api_version = "rbac.authorization.k8s.io/v1",
             kind = "ClusterRole",
@@ -383,14 +399,27 @@ def k8sAddClusterRoles():
 
     for role in cluster_role_list:
         name = "template-cluster-resources___" + role
-        is_clusterrole_exists, error = k8sGetClusterRole(name)
+        is_clusterrole_exists, error = k8sClusterRoleGet(name)
         if error:
             continue
         else:
             if is_clusterrole_exists:
-                logger.info("ClusterRole %s alredy exists" % name) # WARNING
+                logger.info("ClusterRole %s already exists" % name) # WARNING
             else:
-                k8sCreateClusterRole(name, roleVars[role])
+                k8sClusterRoleCreate(name, roleVars[role])
+                logger.info("ClusterRole %s created" % name) # WARNING
+
+    for role in namespaced_role_list:
+        name = "template-namespaced-resources___" + role
+        is_clusterrole_exists, error = k8sClusterRoleGet(name)
+        if error:
+            continue
+        else:
+            if is_clusterrole_exists:
+                logger.info("ClusterRole %s already exists" % name) # WARNING
+            else:
+                k8sClusterRoleCreate(name, roleVars[role])
+                logger.info("ClusterRole %s created" % name) # WARNING
 
 ##############################################################
 ## Kubernetes Nodes
@@ -405,7 +434,7 @@ def k8sListNodes(username_role, user_token):
     except ApiException as e:
         return node_list, e
 
-def k8sGetNodesList(username_role, user_token):
+def k8sNodesListGet(username_role, user_token):
     k8sClientConfigGet(username_role, user_token)
     nodes, error = k8sListNodes(username_role, user_token)
     NODE_LIST = []
@@ -424,7 +453,10 @@ def k8sGetNodesList(username_role, user_token):
             taints = no.spec.taints
             if taints:
                 for t in taints:
-                    NODE_INFO["taint"].append(t.key)
+                    if t.value:
+                        NODE_INFO["taint"].append(t.key + "=" + t.value)
+                    else:
+                        NODE_INFO["taint"].append(t.key + "=")
             NODE_INFO['role'] = None
             for label, value in no.metadata.labels.items():
                 if label == "kubernetes.io/os":
@@ -452,7 +484,7 @@ def k8sGetNodesList(username_role, user_token):
 ## StatefulSets
 ##############################################################
 
-def k8sGetStatefulSets(username_role, user_token, ns):
+def k8sStatefulSetsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     STATEFULSET_LIST = list()
     try:
@@ -486,7 +518,7 @@ def k8sGetStatefulSets(username_role, user_token, ns):
 ## DaemonSets
 ##############################################################
 
-def k8sGetDaemonSets(username_role, user_token, ns):
+def k8sDaemonSetsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     DAEMONSET_LIST = list()
     try:
@@ -520,7 +552,7 @@ def k8sGetDaemonSets(username_role, user_token, ns):
 ## Deployments
 ##############################################################
 
-def k8sGetDeployments(username_role, user_token, ns):
+def k8sDeploymentsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     DEPLOYMENT_LIST = list()
     try:
@@ -544,7 +576,7 @@ def k8sGetDeployments(username_role, user_token, ns):
 ## ReplicaSets
 ##############################################################
 
-def k8sGetReplicaSets(username_role, user_token, ns):
+def k8sReplicaSetsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     REPLICASET_LIST = list()
     try:
@@ -582,7 +614,7 @@ def k8sGetReplicaSets(username_role, user_token, ns):
 ## Pods
 ##############################################################
 
-def k8sGetPodList(username_role, user_token, ns):
+def k8sPodListGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     POD_LIST = list()
     print(ns)
@@ -604,7 +636,7 @@ def k8sGetPodList(username_role, user_token, ns):
         ErrorHandler(error, "get pod list")
         return POD_LIST
 
-def k8sGetPod(username_role, user_token, ns, po):
+def k8sPodGet(username_role, user_token, ns, po):
     k8sClientConfigGet(username_role, user_token)
     POD_DATA = {}
     try: 
@@ -633,24 +665,26 @@ def k8sGetPod(username_role, user_token, ns, po):
             # Conditions
             "conditions": list(),
         }
-        for key, value in pod_data.metadata.labels.items():
-            label = {
-                key: value
-            }
-            POD_DATA['labels'].append(label)
+        if pod_data.metadata.labels:
+            for key, value in pod_data.metadata.labels.items():
+                label = {
+                    key: value
+                }
+                POD_DATA['labels'].append(label)
         if pod_data.metadata.owner_references:
             for owner in pod_data.metadata.owner_references:
                 POD_DATA['owner'] = "%ss/%s" % (owner.kind.lower(), owner.name)
         for c in  pod_data.spec.containers:
-            for e in c.env:
-                ed = e.to_dict()
-                for name, val in ed.items():
-                    if "value_from" in name and val is not None:
-                        for key, value in val.items():
-                            if "secret_key_ref" in key:
-                                for n, v in value.items():
-                                    if "name" in n:
-                                        POD_DATA['secrets'].append(v)
+            if c.env:
+                for e in c.env:
+                    ed = e.to_dict()
+                    for name, val in ed.items():
+                        if "value_from" in name and val is not None:
+                            for key, value in val.items():
+                                if "secret_key_ref" in key:
+                                    for n, v in value.items():
+                                        if "name" in n:
+                                            POD_DATA['secrets'].append(v)
             for cs in pod_data.status.container_statuses:
                 if cs.name == c.name:
                     CONTAINERS = {
@@ -671,8 +705,9 @@ def k8sGetPod(username_role, user_token, ns, po):
                             "restarts": ics.restart_count,
                         }
                         POD_DATA['init_containers'].append(CONTAINERS)
-        for ips in pod_data.spec.image_pull_secrets:
-            POD_DATA['image_pull_secrets'].append(ips.to_dict())
+        if pod_data.spec.image_pull_secrets:
+            for ips in pod_data.spec.image_pull_secrets:
+                POD_DATA['image_pull_secrets'].append(ips.to_dict())
         for v in pod_data.spec.volumes:
             # secret
             if v.persistent_volume_claim:
@@ -691,7 +726,7 @@ def k8sGetPod(username_role, user_token, ns, po):
         ErrorHandler(error, "get pods in this namespace")
         return POD_DATA
 
-def k8sGetPodListVuls(username_role, user_token, ns):
+def k8sPodListVulnsGet(username_role, user_token, ns):
     k8sClientConfigGet(username_role, user_token)
     POD_VULN_LIST = list()
     pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns)
@@ -732,31 +767,30 @@ def k8sGetPodListVuls(username_role, user_token, ns):
 
     return HAS_REPORT, POD_VULN_LIST
 
-def k8sGetPodVuls(username_role, user_token, ns, pod):
+def k8sPodVulnsGet(username_role, user_token, ns, pod):
     k8sClientConfigGet(username_role, user_token)
-    POD_VULN_LIST = list()
-    POD_VULN_SUM = {
-        "critical": 0,
-        "high": 0,
-        "medium": 0,
-        "low": 0,
-        "scan_status": None,
-    }
+    pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns)
     try:
-        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object(
-            "trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports"
-        )
+        vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
+        HAS_REPORT = True
     except:
         vulnerabilityreport_list = False
-    
-    if vulnerabilityreport_list:
-        for vr in vulnerabilityreport_list['items']:
-            if vr['metadata']['labels']['trivy-operator.pod.name'] == pod:
-                POD_VULN_SUM['critical'] += vr['report']['summary']['criticalCount']
-                POD_VULN_SUM['high'] += vr['report']['summary']['highCount']
-                POD_VULN_SUM['medium'] += vr['report']['summary']['mediumCount']
-                POD_VULN_SUM['low'] += vr['report']['summary']['lowCount']
-            if POD_VULN_SUM['critical'] > 0 or POD_VULN_SUM['high'] > 0 or POD_VULN_SUM['medium'] > 0 or POD_VULN_SUM['low'] > 0:
-                POD_VULN_SUM['scan_status'] = "OK"
-            POD_VULN_LIST.append(POD_VULN_SUM)
-    return POD_VULN_LIST
+        HAS_REPORT = False
+
+    for po in pod_list.items:
+        POD_VULNS = {}
+        if po == pod:
+            if vulnerabilityreport_list:
+                for vr in vulnerabilityreport_list['items']:
+                    if vr['metadata']['labels']['trivy-operator.pod.name'] == po.metadata.name:
+                        VULN_LIST = list()
+                        for vuln in vr['report']['vulnerabilities']:
+                            VULN_LIST.append([
+                                vuln['vulnerabilityID'],
+                                vuln['severity'],
+                                vuln['score'],
+                                vuln['resource'],
+                                vuln['installedVersion']
+                            ])
+                        POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
+        return HAS_REPORT, POD_VULNS

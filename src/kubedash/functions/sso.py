@@ -35,6 +35,16 @@ def SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scopes
         db.session.add(sso_data)
         db.session.commit()
 
+def SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_secret, base_uri, scope):
+    sso = Openid.query.filter_by(oauth_server_uri=oauth_server_uri_old).first()
+    if sso:
+        sso.oauth_server_uri = oauth_server_uri
+        sso.client_id = client_id
+        sso.client_secret = client_secret
+        sso.base_uri = base_uri
+        sso.scope = scope
+        db.session.commit()
+
 def SSOSererGet():
     return Openid.query.get(1)
 

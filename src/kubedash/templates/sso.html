@@ -26,6 +26,12 @@
   <div class="card-body">
     <form action="/sso-config" method="POST">
       <div class="messages"></div>
+      {% if oauth_server_uri %}
+      <input type="hidden" name="request_type" value="edit" />
+      <input type="hidden" name="oauth_server_uri_old" value="{{ oauth_server_uri }}" />
+      {% else %}
+      <input type="hidden" name="request_type" value="create" />
+      {% endif %}
       <div class="col-sm-4">
         <div class="form-group">
           <label for="oauth_server_uri">Identity Provider Config</label>

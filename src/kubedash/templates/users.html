@@ -114,7 +114,7 @@
                     <td>
                       {% if username_role == "Admin" and user.username != "admin" %}
                       <!-- Button trigger modal edit -->
-                      <form action="/users/delete" method="post">
+                      <form action="/users/delete" method="POST">
                           <button type="button" class="btn btn-warning btn-xs" data-toggle="modal" data-target="#modaledit{{ user.id }}" data-user="{{ user.username }}" data-role="{{ user.role }}">Edit</button>
                           {% if user.username != username %}
                           <input type="hidden"  name="username" value="{{ user.username }}"/>
@@ -158,6 +158,7 @@
             </select>
           </div>
           <div class="form-group">
+            {% if user_role_template_list %}
             {% if user.user_type == "OpenID" %}
             <hr class="mt-2 mb-3"/>
             <h6 class="modal-title mt-2 mb-2">Privileges</h6>
@@ -233,6 +234,7 @@
               <option value="{{ user_clusterRole }}">{{ user_clusterRole }}</option>
               {% endfor %}
             </select>
+            {% endif %}
             {% endif %}
             <div class="modal-footer mt-2">
               <div class="form-group">

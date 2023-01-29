@@ -4,14 +4,14 @@ from __main__ import app
 import requests, json, yaml, re
 from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
     UserCreateSSO
-from functions.sso import SSOServerCreate, SSOSererGet, get_auth_server_info
-from functions.k8s import k8sServerConfigCreate, k8sServerConfigGet, k8sServerConfigList, \
-    k8sGetNodesList, \
-    k8sGetNamespaceList, k8sGetNamespaces, k8sCreateNamespace, k8sDeleteNamespace, \
-    k8sGetUserClusterRoleTemplateList, k8sGetUserRoleTemplateList, \
-    k8sGetStatefulSets, k8sGetDaemonSets, k8sGetDeployments, k8sGetReplicaSets, \
-    k8sGetPodList, k8sGetPod, \
-    k8sGetPodListVuls, k8sGetPodVuls
+from functions.sso import SSOServerCreate, SSOSererGet, SSOServerUpdate, get_auth_server_info
+from functions.k8s import k8sNodesListGet, \
+    k8sServerConfigCreate, k8sServerConfigGet, k8sServerConfigList, k8sServerDelete, k8sServerConfigUpdate, \
+    k8sNamespaceListGet, k8sNamespacesGet, k8sNamespaceCreate, k8sNamespaceDelete, \
+    k8sUserClusterRoleTemplateListGet, k8sUserRoleTemplateListGet, \
+    k8sStatefulSetsGet, k8sDaemonSetsGet, k8sDeploymentsGet, k8sReplicaSetsGet, \
+    k8sPodListGet, k8sPodGet, \
+    k8sPodListVulnsGet, k8sPodVulnsGet
 from flask import jsonify, session, render_template, request, redirect, flash, url_for, \
     Response
 from flask_login import login_user, login_required, current_user, logout_user
@@ -115,12 +115,13 @@ def users():
         user_token = session['oauth_token']
     else:
         user_token = None
-    namespace_list = k8sGetNamespaceList(username_role, user_token)
-    user_clusterRole_template_list = k8sGetUserClusterRoleTemplateList(username_role, user_token)
-    user_role_template_list = k8sGetUserRoleTemplateList(username_role, user_token)
-    if not user_clusterRole_template_list and not user_role_template_list:
-        from functions.k8s import k8sAddClusterRoles
-        k8sAddClusterRoles()
+    namespace_list = k8sNamespaceListGet(username_role, user_token)
+    user_clusterRole_template_list = k8sUserClusterRoleTemplateListGet(username_role, user_token)
+    user_role_template_list = k8sUserRoleTemplateListGet(username_role, user_token)
+    
+    if not bool(user_clusterRole_template_list) or not bool(user_role_template_list):
+        from functions.k8s import k8sClusterRolesAdd
+        k8sClusterRolesAdd()
 
     return render_template(
         'users.html',
@@ -186,13 +187,13 @@ def sso_config():
         while("" in scope):
             scope.remove("")
 
-        SSOServerCreate(
-            oauth_server_uri,
-            client_id, 
-            client_secret,
-            base_uri,
-            scope
-        )
+        request_type = request.form['request_type']
+        if request_type == "edit":
+            oauth_server_uri_old = request.form['oauth_server_uri_old']
+            SSOServerUpdate(oauth_server_uri_old, oauth_server_uri, client_id, client_secret, base_uri, scope)
+        elif request_type == "create":
+            SSOServerCreate(oauth_server_uri, client_id, client_secret, base_uri, scope)
+
         flash("SSO Server Updated Successfully", "success")
         return render_template(
             'sso.html',
@@ -322,12 +323,25 @@ def index():
 @login_required
 def k8s_config():
     if request.method == 'POST':
-        k8s_server_url = request.form['k8s_server_url']
-        k8s_context = request.form['k8s_context']
-        k8s_server_ca = str(base64_encode(request.form['k8s_server_ca']), 'UTF-8')
+        request_type = request.form['request_type']
+        if request_type == "create":
+            k8s_server_url = request.form['k8s_server_url']
+            k8s_context = request.form['k8s_context']
+            k8s_server_ca = str(base64_encode(request.form['k8s_server_ca']), 'UTF-8')
 
-        k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca)
-        flash("Kubernetes Config Updated Successfully", "success")
+            k8sServerConfigCreate(k8s_server_url, k8s_context, k8s_server_ca)
+            flash("Kubernetes Config Updated Successfully", "success")
+        elif request_type == "edit":
+            k8s_server_url = request.form['k8s_server_url']
+            k8s_context = request.form['k8s_context']
+            k8s_context_old = request.form['k8s_context_old']
+            k8s_server_ca = str(base64_encode(request.form['k8s_server_ca']), 'UTF-8')
+
+            k8sServerConfigUpdate(k8s_context_old, k8s_server_url, k8s_context, k8s_server_ca)
+            flash("Kubernetes Config Updated Successfully", "success")
+        elif request_type == "delete":
+            k8s_context = request.form['k8s_context']
+            k8sServerDelete(k8s_context)
 
     current_username = current_user.username
     user_tmp = User.query.filter_by(username=current_username).first()
@@ -486,7 +500,7 @@ def nodes():
     else:
         user_token = None
 
-    node_data = k8sGetNodesList(username_role, user_token)
+    node_data = k8sNodesListGet(username_role, user_token)
 
     return render_template(
         'nodes.html',
@@ -513,7 +527,7 @@ def namespaces():
     else:
         user_token = None
 
-    namespace_list = k8sGetNamespaces(username_role, user_token)
+    namespace_list = k8sNamespacesGet(username_role, user_token)
 
     return render_template(
         'namespaces.html',
@@ -537,7 +551,7 @@ def namespaces_create():
         else:
             user_token = None
 
-        k8sCreateNamespace(username_role, user_token, namespace)
+        k8sNamespaceCreate(username_role, user_token, namespace)
         return redirect(url_for('namespaces'))
     else:
         return redirect(url_for('namespaces'))
@@ -557,7 +571,7 @@ def namespaces_delete():
         else:
             user_token = None
 
-        k8sDeleteNamespace(username_role, user_token, namespace)
+        k8sNamespaceDelete(username_role, user_token, namespace)
         return redirect(url_for('namespaces'))
     else:
         return redirect(url_for('namespaces'))
@@ -587,8 +601,8 @@ def statefulsets():
     else:
         user_token = None
 
-    statefulset_list = k8sGetStatefulSets(username_role, user_token, ns_select)
-    namespace_list = k8sGetNamespaceList(username_role, user_token)
+    statefulset_list = k8sStatefulSetsGet(username_role, user_token, ns_select)
+    namespace_list = k8sNamespaceListGet(username_role, user_token)
 
     return render_template(
         'statefulsets.html',
@@ -623,8 +637,8 @@ def daemonsets():
     else:
         user_token = None
 
-    daemonset_list = k8sGetDaemonSets(username_role, user_token, ns_select)
-    namespace_list = k8sGetNamespaceList(username_role, user_token)
+    daemonset_list = k8sDaemonSetsGet(username_role, user_token, ns_select)
+    namespace_list = k8sNamespaceListGet(username_role, user_token)
 
     return render_template(
         'daemonsets.html',
@@ -659,8 +673,8 @@ def deployments():
     else:
         user_token = None
 
-    deployments_list = k8sGetDeployments(username_role, user_token, ns_select)
-    namespace_list = k8sGetNamespaceList(username_role, user_token)
+    deployments_list = k8sDeploymentsGet(username_role, user_token, ns_select)
+    namespace_list = k8sNamespaceListGet(username_role, user_token)
 
     return render_template(
         'deployments.html',
@@ -695,8 +709,8 @@ def replicasets():
     else:
         user_token = None
 
-    replicaset_list = k8sGetReplicaSets(username_role, user_token, ns_select)
-    namespace_list = k8sGetNamespaceList(username_role, user_token)
+    replicaset_list = k8sReplicaSetsGet(username_role, user_token, ns_select)
+    namespace_list = k8sNamespaceListGet(username_role, user_token)
 
     return render_template(
         'replicasets.html',
@@ -728,9 +742,9 @@ def pods():
     else:
         user_token = None
 
-    #pod_list = k8sGetPodList(username_role, user_token, ns_select)
-    has_report, pod_list = k8sGetPodListVuls(username_role, user_token, ns_select)
-    namespace_list = k8sGetNamespaceList(username_role, user_token)
+    #pod_list = k8sPodListGet(username_role, user_token, ns_select)
+    has_report, pod_list = k8sPodListVulnsGet(username_role, user_token, ns_select)
+    namespace_list = k8sNamespaceListGet(username_role, user_token)
 
     return render_template(
         'pods.html',
@@ -758,12 +772,17 @@ def pods_data():
         else:
             user_token = None
 
-        pod_data = k8sGetPod(username_role, user_token, ns_name, po_name)
+        pod_data = k8sPodGet(username_role, user_token, ns_name, po_name)
+        has_report, pod_vulns = k8sPodVulnsGet(username_role, user_token, ns_name, po_name)
+
+        # https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3715
 
         return render_template(
             'pod-data.html',
             po_now = po_name,
             pod_data = pod_data,
+            has_report = has_report,
+            pod_vulns = pod_vulns,
             username_role = username_role,
             current_username = current_username,
         )
