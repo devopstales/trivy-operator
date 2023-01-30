@@ -246,6 +246,9 @@ async def create_fn( logger, spec, **kwargs):
                     data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
                     registry_list.append(data)
                     logger.debug(format(data)) # debuglog
+                else:
+                    logger.error("Unknown pull secret format")
+                    logger.debug(format(secret.data)) # debuglog
             except ApiException as e:
                 logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
                 logger.debug("Exception when calling CoreV1Api->read_namespaced_secret: %s\n" % e) # debuglog
