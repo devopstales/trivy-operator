@@ -236,10 +236,16 @@ async def create_fn( logger, spec, **kwargs):
         for secret_name in secret_names:
             try:
                 secret = v1.read_namespaced_secret(secret_name, secret_namespace)
-                secret_data = secret.data['.dockerconfigjson']
-                data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
-                registry_list.append(data['auths'])
-                logger.debug(format(data['auths'])) # debuglog
+                if secret.data['.dockerconfigjson']:
+                    secret_data = secret.data['.dockerconfigjson']
+                    data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
+                    registry_list.append(data['auths'])
+                    logger.debug(format(data['auths'])) # debuglog
+                elif secret.data['.dockercfg']:
+                    secret_data = secret.data['.dockercfg']
+                    data = json.loads(base64.b64decode(secret_data).decode("utf-8"))
+                    registry_list.append(data)
+                    logger.debug(format(data)) # debuglog
             except ApiException as e:
                 logger.error("%s secret dose not exist in namespace %s" % (secret_name, secret_namespace))
                 logger.debug("Exception when calling CoreV1Api->read_namespaced_secret: %s\n" % e) # debuglog
