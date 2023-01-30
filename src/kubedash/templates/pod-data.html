@@ -110,10 +110,12 @@
                                 <tbody>
                                     {% for ic in pod_data.init_containers %}
                                     <tr>
-                                        {% if ic.ready %}
-                                        <td><span class="badge badge-success">Ready</span></td>
+                                        {% if ic.ready == "Completed"%}
+                                        <td><span class="badge badge-secondary">{{ ic.ready }}</span></td>
+                                        {% elif ic.ready == "ImagePullBackOff" %}
+                                        <td><span class="badge badge-danger">{{ ic.ready }}</span></td>
                                         {% else %}
-                                        <td><span class="badge badge-danger">NotReady</span></td>
+                                        <td>{{ ic.ready }}</td>
                                         {% endif %}
                                         <td>{{ ic.name }}</td>
                                         <td>{{ ic.image }}</td>
@@ -138,10 +140,14 @@
                                 <tbody>
                                     {% for c in pod_data.containers %}
                                     <tr>
-                                        {% if c.ready %}
-                                        <td><span class="badge badge-success">Ready</span></td>
+                                        {% if c.ready == "Running"%}
+                                        <td><span class="badge badge-success">{{ c.ready }}</span></td>
+                                        {% elif c.ready == "ImagePullBackOff" %}
+                                        <td><span class="badge badge-danger">{{ c.ready }}</span></td>
+                                        {% elif c.ready == "PodInitializing"%}
+                                        <td><span class="badge badge-secondary">{{ c.ready }}</span></td>
                                         {% else %}
-                                        <td><span class="badge badge-danger">NotReady</span></td>
+                                        <td>{{ c.ready }}</td>
                                         {% endif %}
                                         <td>{{ c.name }}</td>
                                         <td>{{ c.image }}</td>

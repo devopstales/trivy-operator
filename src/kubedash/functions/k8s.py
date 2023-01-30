@@ -687,23 +687,39 @@ def k8sPodGet(username_role, user_token, ns, po):
                                             POD_DATA['secrets'].append(v)
             for cs in pod_data.status.container_statuses:
                 if cs.name == c.name:
-                    CONTAINERS = {
-                        "name": c.name,
-                        "image": c.image,
-                        "ready": cs.ready,
-                        "restarts": cs.restart_count,
-                    }
+                    if cs.ready:
+                        CONTAINERS = {
+                            "name": c.name,
+                            "image": c.image,
+                            "ready": "Running",
+                            "restarts": cs.restart_count,
+                        }
+                    else:
+                        CONTAINERS = {
+                            "name": c.name,
+                            "image": c.image,
+                            "ready": cs.state.waiting.reason,
+                            "restarts": cs.restart_count,
+                        }
             POD_DATA['containers'].append(CONTAINERS)
         if pod_data.spec.init_containers:
             for ic in pod_data.spec.init_containers:
                 for ics in pod_data.status.init_container_statuses:
                     if ics.name == ic.name:
-                        CONTAINERS = {
-                            "name": ic.name,
-                            "image": ic.image,
-                            "ready": ics.ready,
-                            "restarts": ics.restart_count,
-                        }
+                        if ics.ready:
+                            CONTAINERS = {
+                                "name": ic.name,
+                                "image": ic.image,
+                                "ready": ics.state.terminated.reason,
+                                "restarts": ics.restart_count,
+                            }
+                        else:
+                            CONTAINERS = {
+                                "name": ic.name,
+                                "image": ic.image,
+                                "ready": ics.state.waiting.reason,
+                                "restarts": ics.restart_count,
+                            }
                         POD_DATA['init_containers'].append(CONTAINERS)
         if pod_data.spec.image_pull_secrets:
             for ips in pod_data.spec.image_pull_secrets:
