@@ -5,8 +5,8 @@ on:
       - "*.*"
 
 jobs:
-  deploy:
-    name: Deploy release
+  build-trivy-operator:
+    name: Build trivy-operator
     runs-on: ubuntu-20.04
     permissions:
       contents: write
@@ -16,19 +16,23 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: true
+
       - run: |
           echo "TRIVY=$(curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d 'v' -f2)" >> $GITHUB_ENV
-          echo "BENCH=$(curl --silent https://api.github.com/repos/aquasecurity/kube-bench/releases/latest | jq -r .name | cut -d "v" -f2)" >> $GITHUB_ENV
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
+
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
+
       - name: Login to DockerHub
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Prepare trivy
         id: prep_trivy
         run: |
@@ -45,22 +49,6 @@ jobs:
           mkdir docker/trivy-operator/arm64v8
           cp /tmp/trivy docker/trivy-operator/arm64v8/trivy
           rm -f /tmp/trivy.tar.gz /tmp/trivy
-      - name: Prepare kube-bench
-        id: prep_kube-bench
-        run: |
-          cp kube-bench-scnner.py docker/kube-bench-scnner/kube-bench-scnner.py
-          # amd64 kube-bench
-          wget -q -O /tmp/kube-bench.tar.gz https://github.com/aquasecurity/kube-bench/releases/download/v${{env.BENCH}}/kube-bench_${{env.BENCH}}_linux_amd64.tar.gz
-          tar -C /tmp -xf /tmp/kube-bench.tar.gz
-          mkdir docker/kube-bench-scnner/amd64
-          cp /tmp/kube-bench docker/kube-bench-scnner/amd64/kube-bench
-          rm -rf /tmp/kube-bench.tar.gz /tmp/kube-bench
-          # arm64v8
-          wget -q -O /tmp/kube-bench.tar.gz https://github.com/aquasecurity/kube-bench/releases/download/v${{env.BENCH}}/kube-bench_${{env.BENCH}}_linux_arm64.tar.gz
-          tar -C /tmp -xf /tmp/kube-bench.tar.gz
-          mkdir docker/kube-bench-scnner/arm64v8
-          cp /tmp/kube-bench docker/kube-bench-scnner/arm64v8/kube-bench
-          rm -rf /tmp/kube-bench.tar.gz /tmp/kube-bench
 
       - name: Build amd64 trivy-operator
         uses: docker/build-push-action@v3.3.0
@@ -89,6 +77,51 @@ jobs:
           images: devopstales/trivy-operator:${{github.ref_name}}-amd64,devopstales/trivy-operator:${{github.ref_name}}-arm64v8
           push: true
 
+  build-kube-bench-scnner:
+    name: Build kube-bench-scnner
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - run: |
+          echo "BENCH=$(curl --silent https://api.github.com/repos/aquasecurity/kube-bench/releases/latest | jq -r .name | cut -d "v" -f2)" >> $GITHUB_ENV
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Prepare kube-bench
+        id: prep_kube-bench
+        run: |
+          cp kube-bench-scnner.py docker/kube-bench-scnner/kube-bench-scnner.py
+          # amd64 kube-bench
+          wget -q -O /tmp/kube-bench.tar.gz https://github.com/aquasecurity/kube-bench/releases/download/v${{env.BENCH}}/kube-bench_${{env.BENCH}}_linux_amd64.tar.gz
+          tar -C /tmp -xf /tmp/kube-bench.tar.gz
+          mkdir docker/kube-bench-scnner/amd64
+          cp /tmp/kube-bench docker/kube-bench-scnner/amd64/kube-bench
+          rm -rf /tmp/kube-bench.tar.gz /tmp/kube-bench
+          # arm64v8
+          wget -q -O /tmp/kube-bench.tar.gz https://github.com/aquasecurity/kube-bench/releases/download/v${{env.BENCH}}/kube-bench_${{env.BENCH}}_linux_arm64.tar.gz
+          tar -C /tmp -xf /tmp/kube-bench.tar.gz
+          mkdir docker/kube-bench-scnner/arm64v8
+          cp /tmp/kube-bench docker/kube-bench-scnner/arm64v8/kube-bench
+          rm -rf /tmp/kube-bench.tar.gz /tmp/kube-bench
+
       - name: Build amd64 kube-bench-scnner
         uses: docker/build-push-action@v3.3.0
         with:
@@ -116,6 +149,13 @@ jobs:
           images: devopstales/kube-bench-scnner:${{github.ref_name}}-amd64,devopstales/kube-bench-scnner:${{github.ref_name}}-arm64v8
           push: true
 
+  release:
+    name: Create Release
+    runs-on: ubuntu-20.04
+    needs:
+      - build-trivy-operator
+      - build-kube-bench-scnner
+    steps:
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
