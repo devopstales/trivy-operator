@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from __main__ import app
-import requests, json, yaml, re
+import requests, json, yaml
 from functions.user import email_check, User, UserCreate, UserUpdate, UserDelete, \
     UserCreateSSO
 from functions.sso import SSOServerCreate, SSOSererGet, SSOServerUpdate, get_auth_server_info

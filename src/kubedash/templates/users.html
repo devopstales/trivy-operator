@@ -2,6 +2,7 @@
 
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -115,10 +116,14 @@
                       {% if username_role == "Admin" and user.username != "admin" %}
                       <!-- Button trigger modal edit -->
                       <form action="/users/delete" method="POST">
-                          <button type="button" class="btn btn-warning btn-xs" data-toggle="modal" data-target="#modaledit{{ user.id }}" data-user="{{ user.username }}" data-role="{{ user.role }}">Edit</button>
+                          <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-target="#modaledit{{ user.id }}" data-user="{{ user.username }}" data-role="{{ user.role }}">
+                              <i class="material-icons">edit</i>
+                          </button>
                           {% if user.username != username %}
                           <input type="hidden"  name="username" value="{{ user.username }}"/>
-                          <input type="submit" class="btn btn-danger btn-xs" name="upvote" value="Delete" />
+                          <button type="submit" rel="tooltip" class="btn btn-danger btn-info btn-just-icon btn-sm" value="upvote">
+                              <i class="material-icons">delete</i>
+                          </button>
                           {% endif %}
                       </form>          
                       {% endif %}

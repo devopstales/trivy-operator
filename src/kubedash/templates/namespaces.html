@@ -2,6 +2,7 @@
 
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -92,9 +93,13 @@
                         {% if username_role == "Admin" %}
                         <!-- Button trigger modal -->
                         <form action="/namespaces/delete" method="post">
-                          <button type="button" class="btn btn-warning btn-xs" data-bs-toggle="modal" data-bs-target="#modaledit" data-ns="{{ ns.name }}">Edit</button>
+                          <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-bs-target="#modaledit" data-ns="{{ ns.name }}">
+                              <i class="material-icons">edit</i>
+                          </button>
                           <input type="hidden"  name="namespace" value="{{ ns.name }}"/>
-                          <input type="submit" class="btn btn-danger btn-xs" name="upvote" value="Delete" />
+                          <button type="submit" rel="tooltip" class="btn btn-danger btn-info btn-just-icon btn-sm" value="upvote">
+                              <i class="material-icons">delete</i>
+                          </button>
                         </form>  
                         {% endif %}
                       </td>

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block header %}
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -87,10 +88,14 @@
                             {% if username_role == "Admin" %}
                             <!-- Button trigger modal edit -->
                             <form action="k8s-config" method="POST">
-                                <button type="button" class="btn btn-warning btn-xs" data-toggle="modal" data-target="#modaledit{{ server.k8s_context }}">Edit</button>
+                                <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="modal" data-target="#modaledit{{ server.k8s_context }}">
+                                    <i class="material-icons">edit</i>
+                                </button>
                                 <input type="hidden" name="request_type" value="delete" />
                                 <input type="hidden" name="k8s_context" value="{{ server.k8s_context }}" />
-                                <input type="submit" class="btn btn-danger btn-xs" name="upvote" value="Delete" />
+                                <button type="submit" rel="tooltip" class="btn btn-danger btn-info btn-just-icon btn-sm" value="upvote">
+                                    <i class="material-icons">delete</i>
+                                </button>
                             </form>
                             {% endif %}
                         </td>

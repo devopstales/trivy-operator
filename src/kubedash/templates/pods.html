@@ -2,6 +2,7 @@
 
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -90,7 +91,9 @@
                         <td>
                           <form action="/pods/delete" method="post">
                               <input type="hidden"  name="pod_name" value="{{ po.name }}"/>
-                              <input type="submit" class="btn btn-danger btn-xs" name="upvote" value="Delete" />
+                              <button type="submit" rel="tooltip" class="btn btn-danger btn-info btn-just-icon btn-sm" value="upvote">
+                                  <i class="material-icons">delete</i>
+                              </button>
                           </form>          
                         </td>
                       </tr>
