@@ -681,7 +681,7 @@ def k8sPodGet(username_role, user_token, ns, po):
                     for name, val in ed.items():
                         if "value_from" in name and val is not None:
                             for key, value in val.items():
-                                if "secret_key_ref" in key:
+                                if "secret_key_ref" in key and value:
                                     for n, v in value.items():
                                         if "name" in n:
                                             POD_DATA['secrets'].append(v)
@@ -788,25 +788,27 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
     pod_list = k8s_client.CoreV1Api().list_namespaced_pod(ns)
     try:
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
-        HAS_REPORT = True
     except:
         vulnerabilityreport_list = False
-        HAS_REPORT = False
+        
 
     for po in pod_list.items:
         POD_VULNS = {}
+        HAS_REPORT = False
         if po == pod:
             if vulnerabilityreport_list:
-                for vr in vulnerabilityreport_list['items']:
-                    if vr['metadata']['labels']['trivy-operator.pod.name'] == po.metadata.name:
-                        VULN_LIST = list()
-                        for vuln in vr['report']['vulnerabilities']:
-                            VULN_LIST.append([
-                                vuln['vulnerabilityID'],
-                                vuln['severity'],
-                                vuln['score'],
-                                vuln['resource'],
-                                vuln['installedVersion']
-                            ])
-                        POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
+                if pod.status.phase:
+                    HAS_REPORT = True
+                    for vr in vulnerabilityreport_list['items']:
+                        if vr['metadata']['labels']['trivy-operator.pod.name'] == po.metadata.name:
+                            VULN_LIST = list()
+                            for vuln in vr['report']['vulnerabilities']:
+                                VULN_LIST.append([
+                                    vuln['vulnerabilityID'],
+                                    vuln['severity'],
+                                    vuln['score'],
+                                    vuln['resource'],
+                                    vuln['installedVersion']
+                                ])
+                            POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
         return HAS_REPORT, POD_VULNS

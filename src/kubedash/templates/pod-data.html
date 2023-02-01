@@ -2,6 +2,7 @@
 
 {% block header %}
     <link href="{{ url_for('static',filename='/vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet" >
+    <link href="{{ url_for('static',filename='/vendor/google/material-icons.css') }}" rel="stylesheet" >
 {% endblock %}
 
 {% block content %}
@@ -101,15 +102,25 @@
                             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                                 <thead>
                                     <tr>
-                                    <th>State</th>
-                                    <th>Name</th>
-                                    <th>Image</th>
-                                    <th>Restarts</th>
+                                    {% if has_report %}
+                                        <th style="width:5%"></th>
+                                    {% endif %}
+                                        <th>State</th>
+                                        <th>Name</th>
+                                        <th>Image</th>
+                                        <th>Restarts</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for ic in pod_data.init_containers %}
                                     <tr>
+                                        {% if has_report %}
+                                        <td>
+                                            <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="collapse" data-target="#ic-{{ ic.name }}" onclick="">
+                                                <i class="material-icons">arrow_forward_ios</i>
+                                            </button>
+                                        </td>
+                                        {% endif %}
                                         {% if ic.ready == "Completed"%}
                                         <td><span class="badge badge-secondary">{{ ic.ready }}</span></td>
                                         {% elif ic.ready == "ImagePullBackOff" %}
@@ -121,6 +132,13 @@
                                         <td>{{ ic.image }}</td>
                                         <td>{{ ic.restarts }}</td>
                                     </tr>
+                                    {% if has_report %}
+                                    <tr>
+                                        <td id="ic-{{ ic.name }}" class="collapse" colspan="5">
+                                          <p>VULN for {{ ic.name }}</p>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -131,6 +149,9 @@
                             <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                                 <thead>
                                     <tr>
+                                    {% if has_report %}
+                                    <th style="width:5%"></th>
+                                    {% endif %}
                                     <th>State</th>
                                     <th>Name</th>
                                     <th>Image</th>
@@ -140,6 +161,13 @@
                                 <tbody>
                                     {% for c in pod_data.containers %}
                                     <tr>
+                                        {% if has_report %}
+                                        <td>
+                                            <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="collapse" data-target="#ic-{{ c.name }}" onclick="">
+                                                <i class="material-icons">arrow_forward_ios</i>
+                                            </button>
+                                        </td>
+                                        {% endif %}
                                         {% if c.ready == "Running"%}
                                         <td><span class="badge badge-success">{{ c.ready }}</span></td>
                                         {% elif c.ready == "ImagePullBackOff" %}
@@ -153,6 +181,13 @@
                                         <td>{{ c.image }}</td>
                                         <td>{{ c.restarts }}</td>
                                     </tr>
+                                    {% if has_report %}
+                                    <tr>
+                                        <td id="ic-{{ c.name }}" class="collapse" colspan="5">
+                                          <p>VULN for {{ c.name }}</p>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
                                     {% endfor %}
                                 </tbody>
                             </table>
