@@ -589,10 +589,13 @@ async def create_fn( logger, spec, **kwargs):
                     docker_registry = "docker.io"
                 try:
                     docker_image_part = image_name.split('/', 1)[1]
-                    docker_image = docker_image_part.split(':')[0]
-                except: 
-                    docker_image = docker_image_part.split(':')[0]
-                docker_tag = image_name.split(':')[-1]
+                except:
+                    try:
+                        docker_image_part = image_name.split('/')[1]
+                    except:
+                        docker_image_part = image_name
+                docker_image = docker_image_part.split(':')[0]
+                docker_tag = docker_image_part.split(':')[1]
 
                 trivy_result = trivy_result_list[image_name]
                 #logger.debug(trivy_result) # debug
@@ -818,10 +821,22 @@ async def create_fn( logger, spec, **kwargs):
                 image = vul_list[pod_name][2]
                 pod_uid = vul_list[pod_name][3]
 
-                image_registry = image.split('/')[0]
-                image_part_name = image.split('/', 1)[1]
+                try:
+                    if validators.domain(image.split('/')[0]):
+                        image_registry = image.split('/')[0]
+                    else:
+                        image_registry = "docker.io"
+                except:
+                    image_registry = "docker.io"
+                try:
+                    image_part_name = image.split('/', 1)[1]
+                except:
+                    try:
+                        image_part_name = image.split('/')[1]
+                    except:
+                        image_part_name = image
                 image_name = image_part_name.split(':')[0]
-                image_tag = image.split(':')[1]
+                image_tag = image_part_name.split(':')[1]
 
                 criticalCount = vuls['CRITICAL']
                 highCount = vuls['HIGH']
