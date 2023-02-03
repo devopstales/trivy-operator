@@ -135,7 +135,37 @@
                                     {% if has_report %}
                                     <tr>
                                         <td id="ic-{{ ic.name }}" class="collapse" colspan="5">
-                                          <p>VULN for {{ ic.name }}</p>
+                                        {% for po, vuls in pod_vulns.items() %}
+                                        {% if po == ic.name %}
+
+                                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Severity</th>
+                                                    <th>Score</th>
+                                                    <th>Package</th>
+                                                    <th>Installed Version</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for v in vuls %}
+                                                <tr>
+                                                    <td>
+                                                        <a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name={{ v.vulnerabilityID }} rel="noopener noreferrer" target="_blank"">
+                                                            {{ v.vulnerabilityID }}
+                                                        </a>
+                                                    </td>
+                                                    <td>{{ v.severity }}</td>
+                                                    <td>{{ v.score }}</td>
+                                                    <td>{{ v.resource }}</td>
+                                                    <td>{{ v.installedVersion }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                        {% endif %}
+                                        {% endfor %}
                                         </td>
                                     </tr>
                                     {% endif %}
@@ -163,7 +193,7 @@
                                     <tr>
                                         {% if has_report %}
                                         <td>
-                                            <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="collapse" data-target="#ic-{{ c.name }}" onclick="">
+                                            <button type="button" class="btn btn-success btn-just-icon btn-xs" data-toggle="collapse" data-target="#c-{{ c.name }}" onclick="">
                                                 <i class="material-icons">arrow_forward_ios</i>
                                             </button>
                                         </td>
@@ -183,8 +213,39 @@
                                     </tr>
                                     {% if has_report %}
                                     <tr>
-                                        <td id="ic-{{ c.name }}" class="collapse" colspan="5">
-                                          <p>VULN for {{ c.name }}</p>
+                                        <td id="c-{{ c.name }}" class="collapse" colspan="5">
+                                            {% for po, vuls in pod_vulns.items() %}
+                                            {% if po == c.name %}
+    
+                                            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>ID</th>
+                                                        <th>Severity</th>
+                                                        <th>Score</th>
+                                                        <th>Package</th>
+                                                        <th>Installed Version</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for v in vuls %}
+                                                    <tr>
+                                                        <td>
+                                                            <!-- https://cve.mitre.org/cgi-bin/cvename.cgi?name={{ v.vulnerabilityID }} -->
+                                                            <a href="https://avd.aquasec.com/nvd/{{ v.vulnerabilityID | lower }}" rel="noopener noreferrer" target="_blank">
+                                                                {{ v.vulnerabilityID }}
+                                                            </a>
+                                                        </td>
+                                                        <td>{{ v.severity }}</td>
+                                                        <td>{{ v.score }}</td>
+                                                        <td>{{ v.resource }}</td>
+                                                        <td>{{ v.installedVersion }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                            {% endif %}
+                                            {% endfor %}
                                         </td>
                                     </tr>
                                     {% endif %}

@@ -789,26 +789,29 @@ def k8sPodVulnsGet(username_role, user_token, ns, pod):
     try:
         vulnerabilityreport_list = k8s_client.CustomObjectsApi().list_namespaced_custom_object("trivy-operator.devopstales.io", "v1", ns, "vulnerabilityreports")
     except:
-        vulnerabilityreport_list = False
-        
+        vulnerabilityreport_list = None
 
     for po in pod_list.items:
         POD_VULNS = {}
         HAS_REPORT = False
-        if po == pod:
-            if vulnerabilityreport_list:
-                if pod.status.phase:
+        if po.metadata.name == pod:
+            if vulnerabilityreport_list is not None:
+                if po.status.phase:
                     HAS_REPORT = True
                     for vr in vulnerabilityreport_list['items']:
                         if vr['metadata']['labels']['trivy-operator.pod.name'] == po.metadata.name:
                             VULN_LIST = list()
                             for vuln in vr['report']['vulnerabilities']:
-                                VULN_LIST.append([
-                                    vuln['vulnerabilityID'],
-                                    vuln['severity'],
-                                    vuln['score'],
-                                    vuln['resource'],
-                                    vuln['installedVersion']
-                                ])
+                                VULN_LIST.append({
+                                    "vulnerabilityID": vuln['vulnerabilityID'],
+                                    "severity": vuln['severity'],
+                                    "score": vuln['score'],
+                                    "resource": vuln['resource'],
+                                    "installedVersion": vuln['installedVersion'],
+                                    #"publishedDate": vuln['publishedDate'],
+                                    #"fixedVersion": vuln['fixedVersion'],
+                                })
                             POD_VULNS.update({vr['metadata']['labels']['trivy-operator.container.name']: VULN_LIST})
         return HAS_REPORT, POD_VULNS
+
+        # PublishedDate, FixedVersion
