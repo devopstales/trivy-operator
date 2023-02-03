@@ -295,14 +295,20 @@ spec:
                     type: object
                     required:
                       - vulnerabilityID
+                      - publishedDate
                       - resource
                       - installedVersion
+                      - fixedVersion
                       - severity
                       - title
                     properties:
                       vulnerabilityID:
                         description: |
                           VulnerabilityID the vulnerability identifier.
+                        type: string
+                      publishedDate:
+                        description: |
+                          PublishedDate indicates the date when the vulnerability is published.
                         type: string
                       resource:
                         description: |
@@ -311,6 +317,10 @@ spec:
                       installedVersion:
                         description: |
                           InstalledVersion indicates the installed version of the Resource.
+                        type: string
+                      fixedVersion:
+                        description: |
+                          FixedVersion indicates the version of the Resource where the vulnerability is fixed.
                         type: string
                       score:
                         type: number

@@ -605,13 +605,15 @@ async def create_fn( logger, spec, **kwargs):
                                 "NONE": 0}
                     vuls_long = {
                         "installedVersion": "",
+                        "fixedVersion": "",
                         "links": [],
                         "primaryLink": "",
                         "resource": "",
                         "score": 0,
                         "severity": "ERROR",
                         "title": "Image Scanning Error",
-                        "vulnerabilityID": ""
+                        "vulnerabilityID": "",
+                        "publishedDate": "",
                     }
                     report_message = "Image Scanning Error: " + str(list(trivy_result.values())[0])
                     report = {
@@ -697,15 +699,27 @@ async def create_fn( logger, spec, **kwargs):
                                 result = "skip"
                                 severity = "INFO"
 
+                            try:
+                                fixed_version = item["FixedVersion"]
+                            except:
+                                fixed_version = ""
+
+                            try:
+                                published_date = item["PublishedDate"]
+                            except:
+                                published_date = ""
+
                             vuls_long = {
                                 "vulnerabilityID": item["VulnerabilityID"],
                                 "resource": item["PkgName"],
                                 "installedVersion": item["InstalledVersion"],
+                                "fixedVersion": fixed_version,
                                 "primaryLink": pLink,
                                 "severity": item["Severity"],
                                 "score": score,
                                 "links": refLink,
                                 "title": title,
+                                "publishedDate": published_date
                             }
                             report = {
                                 "category": "Vulnerability Scan",
@@ -720,7 +734,9 @@ async def create_fn( logger, spec, **kwargs):
                                     "score": str(score),
                                     "primaryLink": pLink,
                                     "installedVersion": item["InstalledVersion"],
+                                    "fixedVersion": fixed_version,
                                     "resultID": str(uuid.uuid4()),
+                                    "publishedDate": published_date
                                 },
                                 "resources": [],
                                 "severity": severity.lower(),
@@ -752,13 +768,15 @@ async def create_fn( logger, spec, **kwargs):
                                 "NONE": 1}
                         vuls_long = {
                             "installedVersion": "",
+                            "fixedVersion": "",
                             "links": [],
                             "primaryLink": "",
                             "resource": "",
                             "score": 0,
                             "severity": "NONE",
                             "title": "There ins no vulnerability in this image",
-                            "vulnerabilityID": ""
+                            "vulnerabilityID": "",
+                            "publishedDate": "",
                         }
                         report = {
                             "category": "Vulnerability Scan",
