@@ -1,5 +1,0 @@
-flask_sqlalchemy
-flask_login
-sqlalchemy_utils
-requests_oauthlib
-kubernetes
