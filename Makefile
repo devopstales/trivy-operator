@@ -6,7 +6,8 @@ all:	 trivy
 
 .DEFAULT_GOAL := help
 
-TRIVY := $(shell curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d "v" -f2)
+# TRIVY := $(shell curl --silent https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r .name | cut -d "v" -f2)
+TRIVY := 0.36.1
 BENCH := $(shell curl --silent https://api.github.com/repos/aquasecurity/kube-bench/releases/latest | jq -r .name | cut -d "v" -f2)
 
 
