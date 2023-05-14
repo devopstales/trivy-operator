@@ -1,0 +1,5 @@
+kopf>=1.36.1
+prometheus_client>=0.16.0
+validators>=0.20.0
+oscrypto>=1.3.0
+certbuilder>=0.14.2
