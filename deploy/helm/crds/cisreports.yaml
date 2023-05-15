@@ -1,0 +1,148 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: cisreports.trivy-operator.devopstales.io
+  labels:
+    app.kubernetes.io/managed-by: trivy-operator
+spec:
+  group: trivy-operator.devopstales.io
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: |
+            CISReports summarizes vulnerabilities in nodes.
+          type: object
+          required:
+            - apiVersion
+            - kind
+            - metadata
+            - report
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            report:
+              description: |
+                Report is the actual vulnerability report data.
+              type: object
+              required:
+                - updateTimestamp
+                - artifact
+                - summary
+                - vulnerabilities
+              properties:
+                updateTimestamp:
+                  description: |
+                    UpdateTimestamp is a timestamp representing the server time in UTC when this report was updated.
+                  type: string
+                  format: date-time
+                artifact:
+                  description: |
+                    Artifact represents a standalone, executable package of software that includes everything needed to
+                    run an application.
+                  type: object
+                  properties:
+                    node:
+                      description: |
+                        Node is the name of the kubernetes node.
+                      type: string
+                    scan_profile:
+                      description: |
+                        The name of the profile used to scan with kube-banch.
+                      type: string
+                    node_type:
+                      description: |
+                        Type of the kubernetes node.
+                      type: string
+                summary:
+                  description: |
+                    Summary is a summary of Vulnerability counts grouped by Severity.
+                  type: object
+                  required:
+                    - fail
+                    - warn
+                    - pass
+                    - info
+                  properties:
+                    fail:
+                      description: |
+                        fail is the number of vulnerabilities that failed.
+                      type: integer
+                      minimum: 0
+                    warn:
+                      description: |
+                        warn is the number of vulnerabilities with warning.
+                      type: integer
+                      minimum: 0
+                    pass:
+                      description: |
+                        pass is the number of vulnerabilities that passed.
+                      type: integer
+                      minimum: 0
+                    info:
+                      description: |
+                        info is the number of vulnerabilities with info.
+                      type: integer
+                      minimum: 0
+                vulnerabilities:
+                  description: |
+                    Vulnerabilities is a list of CIS Vulnerability items found in the Artifact.
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - vulnerabilityID
+                      - result
+                      - description
+                      - resolution
+                      - scored
+                      - multiple
+                    properties:
+                      vulnerabilityID:
+                        description: |
+                          VulnerabilityID the vulnerability identifier.
+                        type: string
+                      result:
+                        description: |
+                          result of the CIS test.
+                        type: string
+                        enum:
+                          - PASS
+                          - WARN
+                          - FAIL
+                      description:
+                        type: string
+                      resolution:
+                        type: string
+                      scored:
+                        type: string
+                      multiple:
+                        type: string
+      additionalPrinterColumns:
+        - jsonPath: .report.artifact.node
+          type: string
+          name: Repository
+          description: The name of the node
+        - jsonPath: .report.artifact.node_type
+          type: string
+          name: Tag
+          description: The type of the node
+        - jsonPath: .report.artifact.scan_profile
+          type: string
+          name: Tag
+          description: The name of thy scan profile
+  scope: Cluster
+  names:
+    singular: cisreport
+    plural: cisreports
+    kind: CISReport
+    categories:
+      - all
+    shortNames:
+      - cisr
