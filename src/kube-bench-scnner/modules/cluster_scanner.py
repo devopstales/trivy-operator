@@ -20,7 +20,7 @@ from modules.prometheus import (
 )
 
 """Test policyReport"""
-def get_clusterpolicyreports(name):
+def get_clusterpolicyreports(logger, name):
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.CustomObjectsApi(api_client)
         group = 'wgpolicyk8s.io'
@@ -33,7 +33,7 @@ def get_clusterpolicyreports(name):
         return True
     except ApiException as e:
         if e.status != 404:
-            print("Exception when testing clusterpolicyreport - %s : %s\n" % (name, e))
+            logger.error("Exception when testing clusterpolicyreport - %s : %s\n" % (name, e))
             return False
         else:
             return False
@@ -56,10 +56,10 @@ def create_clusterpolicyreports(logger, body, name):
         if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
             logger.info("clusterPolicyReport %s already exists!!!" % name)
         else:
-            print("Exception when creating clusterpolicyreport - %s : %s\n" % (name, e))
+            logger.error("Exception when creating clusterpolicyreport - %s : %s\n" % (name, e))
 
 """Delete policyReport"""
-def delete_clusterpolicyreports(name):
+def delete_clusterpolicyreports(logger, name):
     with k8s_client.ApiClient() as api_client:
         api_instance = k8s_client.CustomObjectsApi(api_client)
         group = 'wgpolicyk8s.io'
@@ -69,7 +69,7 @@ def delete_clusterpolicyreports(name):
         api_response = api_instance.delete_cluster_custom_object(
             group, version, plural, name)
     except ApiException as e:
-        print("Exception when deleting clusterpolicyreport - %s : %s\n" % (name, e))
+        logger.error("Exception when deleting clusterpolicyreport - %s : %s\n" % (name, e))
 
 def run_kube_bench(logger, scan_profile):
     if scan_profile is not None:
@@ -100,6 +100,7 @@ def push_result_to_detectdojo(logger, spec, bench_result, scan_profile):
         logger.debug("api_key: %s" % format(defectdojo_api_key)) # debuglog
         logger.debug("k8s_cluster: %s" % format(k8s_cluster)) # debuglog
     except:
+        defectdojo_host = None
         logger.info("defectdojo integration is not set")
     if defectdojo_host is not None and defectdojo_api_key is not None and k8s_cluster is not None:
         headers = dict()
@@ -145,7 +146,7 @@ def push_result_to_detectdojo(logger, spec, bench_result, scan_profile):
                 logger.info("Successfully added host to Defect Dojo")
             else:
                 if "already exists" in response.text:
-                    print()
+                    logger.info("Host already exists in Defect Dojo")
                 else:
                     logger.info("Something went wrong, please debug " + str(response.text))
 
@@ -179,6 +180,10 @@ def generate_cluster_policy_report(logger, bench_result):
                     reason = result["reason"]
                 except:
                     reason = ""
+                if result["status"].lower() == "info":
+                    result_status = "skip"
+                else:
+                    result_status = result["status"].lower()
                 report = {
                     "category": test["desc"],
                     "message": result["test_desc"],
@@ -197,8 +202,7 @@ def generate_cluster_policy_report(logger, bench_result):
                         "test_info": result["test_info"][0],
                         "type": result["type"],
                     },
-                    "result": result["status"].lower(),
-                #      "severity": "",
+                    "result": result_status,
                     "source": "CIS Vulnerability"
                 }
                 ClusterPolicyReport["results"] += [report]
@@ -227,36 +231,80 @@ def generate_cluster_policy_report(logger, bench_result):
                         result_type,
                     ).set(1)
 
-    is_pClusterPolicyReport_exists = get_clusterpolicyreports(report_name)
-    logger.debug("DEBUG - is_pClusterPolicyReport_exists: %s" % is_pClusterPolicyReport_exists) # WARNING
+    is_ClusterPolicyReport_exists = get_clusterpolicyreports(logger, report_name)
+    logger.debug("DEBUG - is_ClusterPolicyReport_exists: %s" % is_ClusterPolicyReport_exists) # WARNING
 
-    if is_pClusterPolicyReport_exists:
+    if is_ClusterPolicyReport_exists:
         logger.info("clusterPolicyReport need deletion") # WARNING
-        delete_clusterpolicyreports(report_name)
-        create_clusterpolicyreports(ClusterPolicyReport, report_name)
+        delete_clusterpolicyreports(logger, report_name)
+        create_clusterpolicyreports(logger, ClusterPolicyReport, report_name)
     else:
-        create_clusterpolicyreports(ClusterPolicyReport, report_name)
+        create_clusterpolicyreports(logger, ClusterPolicyReport, report_name)
 
-def generate_cis_vuln_report(logger, bench_result):
+def get_cisreports(logger, report_name):
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.CustomObjectsApi(api_client)
+        group = 'trivy-operator.devopstales.io'
+        version = 'v1'
+        plural = 'cisreports'
+    try:
+        api_response = api_instance.get_cluster_custom_object(
+            group, version, plural, report_name
+        )
+        return True
+    except ApiException as e:
+        if e.status != 404:
+            logger.error("Exception when testing CISReport - %s : %s\n" % (report_name, e))
+            return False
+        else:
+            return False
+
+def delete_cisreports(logger, report_name):
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.CustomObjectsApi(api_client)
+        group = 'trivy-operator.devopstales.io'
+        version = 'v1'
+        plural = 'cisreports'
+    try:
+        api_response = api_instance.delete_cluster_custom_object(
+            group, version, plural, report_name)
+    except ApiException as e:
+        logger.error("Exception when deleting CISReport - %s : %s\n" % (report_name, e))
+
+def create_cisreports(logger, body, report_name):
+    with k8s_client.ApiClient() as api_client:
+        api_instance = k8s_client.CustomObjectsApi(api_client)
+        group = 'trivy-operator.devopstales.io'
+        version = 'v1'
+        plural = 'cisreports'
+        pretty = 'true'
+        field_manager = 'trivy-operator'
+        body = body
+    try:
+        api_response = api_instance.create_cluster_custom_object(
+            group, version, plural, body, pretty=pretty, field_manager=field_manager)
+        logger.info("New cisreports created") # WARNING
+    except ApiException as e:
+        if e.status == 409:  # if the object already exists the K8s API will respond with a 409 Conflict
+            logger.info("cisreports %s already exists!!!" % report_name)
+        else:
+            logger.error("Exception when creating cisreports - %s : %s\n" % (report_name, e))
+
+def generate_cis_vuln_report(logger, bench_result, scan_profile):
     date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%sZ")
 
     CIS_VULN_REPORT = {
-        "apiVersion": "wgpolicyk8s.io/v1alpha2",
+        "apiVersion": "trivy-operator.devopstales.io/v1",
         "kind": "CISReport",
         "metadata": {
             "name": report_name
             # "labels"
             # "ownerReferences"
         },
-        "results": [],
-    }
-
-    for item in bench_result:
-        report = {
+        "report": {
             "artifact": {
                 "node": NODE_NAME,
-                "node_type": item["node_type"],
-                "scan_profile": item["version"],
+                "scan_profile": scan_profile,
             },
             "summary": {
                 "fail": 0,
@@ -267,21 +315,36 @@ def generate_cis_vuln_report(logger, bench_result):
             "updateTimestamp": date,
             "vulnerabilities": []
         }
-        for test in item["tests"]:
-            report["summary"]["fail"] += test["fail"]
-            report["summary"]["warn"] += test["warn"]
-            report["summary"]["pass"] += test["pass"]
-            report["summary"]["info"] += test["info"]
-            for result in test["results"]:
+    }
 
+    for item in bench_result:
+        for test in item["tests"]:
+            CIS_VULN_REPORT["report"]["summary"]["fail"] += test["fail"]
+            CIS_VULN_REPORT["report"]["summary"]["warn"] += test["warn"]
+            CIS_VULN_REPORT["report"]["summary"]["pass"] += test["pass"]
+            CIS_VULN_REPORT["report"]["summary"]["info"] += test["info"]
+            for result in test["results"]:
                 CIS_vulnerability = {
-                    "vulnerabilityID": result["test_number"],
-                    "result": result["status"],
-                    "description": result["test_desc"],
-                    "resolution": result["remediation"],
-                    "scored": result["scored"],
-                    "multiple":  str(result["IsMultiple"]),
+                    "vulnerabilityID": result["test_number"], # X
+                    "policy": item["text"],
+                    "rule": test["desc"],
+                    "result": result["status"], # X
+                    "description": result["test_desc"], # X
+                    "resolution": result["remediation"], # X
+                    "scored": result["scored"], # X
+                    "multiple":  bool(result["IsMultiple"]), # X
                     }
+                CIS_VULN_REPORT["report"]["vulnerabilities"].append(CIS_vulnerability)
+    
+    is_CISReport_exists = get_cisreports(logger, report_name)
+    logger.debug("DEBUG - is_CISReport_exists: %s" % is_CISReport_exists) # WARNING
+
+    if is_CISReport_exists:
+        logger.info("clusterPolicyReport need deletion") # WARNING
+        delete_cisreports(logger, report_name)
+        create_cisreports(logger, CIS_VULN_REPORT, report_name)
+    else:
+        create_cisreports(logger, CIS_VULN_REPORT, report_name)
 
 def start_cluster_scanner(logger, spec):
     logger.info("ClustereScanner Created")
@@ -312,7 +375,7 @@ def start_cluster_scanner(logger, spec):
             bench_result = run_kube_bench(logger, scan_profile)
             push_result_to_detectdojo(logger, spec, bench_result, scan_profile)
             generate_cluster_policy_report(logger, bench_result)
-            generate_cis_vuln_report(logger, bench_result)
+            generate_cis_vuln_report(logger, bench_result, scan_profile)
         elif (roundedDownTime > nextRunTime):
             now = getCurretnTime()
             logger.debug("MISSED RUN: %s" % now) # WARNING

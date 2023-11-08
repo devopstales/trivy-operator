@@ -54,11 +54,7 @@ spec:
                       type: string
                     scan_profile:
                       description: |
-                        The name of the profile used to scan with kube-banch.
-                      type: string
-                    node_type:
-                      description: |
-                        Type of the kubernetes node.
+                        scan_profile is the kube-dash profile used to scan the cluster.
                       type: string
                 summary:
                   description: |
@@ -98,6 +94,8 @@ spec:
                     type: object
                     required:
                       - vulnerabilityID
+                      - policy
+                      - rule
                       - result
                       - description
                       - resolution
@@ -105,14 +103,15 @@ spec:
                       - multiple
                     properties:
                       vulnerabilityID:
-                        description: |
-                          VulnerabilityID the vulnerability identifier.
+                        type: string
+                      policy:
+                        type: string
+                      rule:
                         type: string
                       result:
-                        description: |
-                          result of the CIS test.
                         type: string
                         enum:
+                          - INFO
                           - PASS
                           - WARN
                           - FAIL
@@ -121,21 +120,17 @@ spec:
                       resolution:
                         type: string
                       scored:
-                        type: string
+                        type: boolean
                       multiple:
-                        type: string
+                        type: boolean
       additionalPrinterColumns:
         - jsonPath: .report.artifact.node
           type: string
-          name: Repository
+          name: Node
           description: The name of the node
-        - jsonPath: .report.artifact.node_type
-          type: string
-          name: Tag
-          description: The type of the node
         - jsonPath: .report.artifact.scan_profile
           type: string
-          name: Tag
+          name: Profile
           description: The name of thy scan profile
   scope: Cluster
   names:

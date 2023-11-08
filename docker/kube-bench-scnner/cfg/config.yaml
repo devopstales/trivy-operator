@@ -249,6 +249,7 @@ version_mapping:
   "1.21": "cis-1.20"
   "1.22": "cis-1.23"
   "1.23": "cis-1.23"
+  "1.24": "cis-1.24"
   "aks-1.0": "aks-1.0"
   "ack-1.0": "ack-1.0"
   "eks-1.0.1": "eks-1.0.1"
@@ -269,8 +270,12 @@ version_mapping:
   "rke2r-1.18.10-hard": "rke2-cis-1.5-hardened"
   "rke2r-1.20.5": "rke2-cis-1.6-permissive"
   "rke2r-1.20.5-hard": "rke2-cis-1.6-hardened"
-  "k3s-1.20.5-hard": "k3s-cis-1.6-hardened"
-  "k3s-1.20.5": "k3s-cis-1.6-permissive"
+  "k3s-1.6-hard": "k3s-cis-1.6-hardened"
+  "k3s-1.6": "k3s-cis-1.6-permissive"
+  "k3s-1.20-hard": "k3s-cis-1.20-hardened"
+  "k3s-1.20": "k3s-cis-1.20-permissive"
+  "k3s-1.23-hard": "k3s-cis-1.23-hardened"
+  "k3s-1.23": "k3s-cis-1.23-permissive"
 
 target_mapping:
   "cis-1.4":
@@ -296,6 +301,12 @@ target_mapping:
     - "etcd"
     - "policies"
   "cis-1.23":
+    - "master"
+    - "node"
+    - "controlplane"
+    - "etcd"
+    - "policies"
+  "cis-1.24":
     - "master"
     - "node"
     - "controlplane"
