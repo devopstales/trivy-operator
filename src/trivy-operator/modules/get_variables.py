@@ -19,6 +19,7 @@ if OFFLINE_ENABLED:
     logger.debug("Trivy offline mode is enabled") # DEBUG-LOG
 else:
     DB_REPOSITORY = None
+    TRIVY_OFFLINE = None
     logger.debug("Trivy offline mode is disabled") # DEBUG-LOG
 
 REDIS_ENABLED = var_test(os.getenv("REDIS_ENABLED", False))
